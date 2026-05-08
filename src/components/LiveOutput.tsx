@@ -150,16 +150,16 @@ export default function LiveOutput() {
       <div className="relative z-10 w-full h-full flex flex-col gap-6">
         {/* Header */}
         <div className="flex justify-between items-start">
-          <div className="flex items-center gap-4 bg-black/60 backdrop-blur-md px-6 py-3 rounded-xl border border-white/10">
-            <div className="relative flex items-center gap-2">
-              <div className="absolute -left-1 -top-1 w-full h-full bg-red-600/20 blur-md rounded-full animate-ping" />
-              <div className="bg-red-600 text-white text-xs font-black px-2 py-0.5 rounded-sm flex items-center gap-1.5 uppercase tracking-widest">
-                <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+          <div className="flex items-center gap-6 bg-black/60 backdrop-blur-md px-10 py-5 rounded-2xl border border-white/10 shadow-2xl">
+            <div className="relative flex items-center gap-3">
+              <div className="absolute -left-2 -top-2 w-full h-full bg-red-600/30 blur-xl rounded-full animate-ping" />
+              <div className="bg-red-600 text-white text-sm font-black px-3 py-1 rounded-md flex items-center gap-2 uppercase tracking-[0.2em] shadow-[0_0_15px_rgba(220,38,38,0.5)]">
+                <div className="w-2 h-2 bg-white rounded-full animate-pulse shadow-[0_0_8px_white]" />
                 Live
               </div>
             </div>
-            <div className="h-6 w-px bg-white/20" />
-            <h1 className="text-xl font-black tracking-tighter uppercase italic">
+            <div className="h-10 w-px bg-white/20" />
+            <h1 className="text-4xl font-black tracking-tighter uppercase italic drop-shadow-lg">
               Shkodra <span className="text-brand-red">Politike</span>
             </h1>
           </div>
