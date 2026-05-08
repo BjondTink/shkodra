@@ -1,0 +1,41 @@
+{
+  "entities": {
+    "newsItems": {
+      "title": "News Item",
+      "description": "A single news slide for the broadcast",
+      "type": "object",
+      "properties": {
+        "headline": { "type": "string" },
+        "scrollingText": { "type": "string" },
+        "mediaUrl": { "type": "string" },
+        "mediaType": { "type": "string", "enum": ["image", "video"] },
+        "duration": { "type": "number" },
+        "isBreakingNews": { "type": "boolean" },
+        "order": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["headline", "scrollingText", "mediaUrl", "mediaType", "duration", "order"]
+    },
+    "appStatus": {
+      "title": "App Status",
+      "description": "Real-time state shared across dashboard and live output",
+      "type": "object",
+      "properties": {
+        "activeItemId": { "type": "string" },
+        "isPlaying": { "type": "boolean" },
+        "lastUpdated": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "firestore": {
+    "/newsItems/{itemId}": {
+      "schema": "newsItems",
+      "description": "Collection of news items in the queue"
+    },
+    "/status/current": {
+      "schema": "appStatus",
+      "description": "Singleton for current playback status"
+    }
+  }
+}
