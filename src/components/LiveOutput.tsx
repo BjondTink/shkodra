@@ -57,8 +57,37 @@ export default function LiveOutput() {
   }, [currentIndex, newsItems, status]);
 
   const activeItem = newsItems[currentIndex];
+  const [tickerData, setTickerData] = useState<{ weather: string; rates: string[] }>({
+    weather: "Moti Shkodër: --",
+    rates: ["EUR/ALL: 100.25", "USD/ALL: 91.40", "CHF/ALL: 104.80", "GBP/ALL: 116.15"]
+  });
 
-  // Logic for flexible font sizes based on content length
+  // Fetch Ticker Info
+  useEffect(() => {
+    const fetchTickerInfo = async () => {
+      // Mocked weather for Shkodra (Real-time feeling)
+      const hours = new Date().getHours();
+      const temp = 16 + Math.floor(Math.random() * 5);
+      const conditions = hours > 19 || hours < 6 ? "Kthellët" : "Diell";
+      
+      setTickerData({
+        weather: `Moti në Shkodër: ${temp}°C ${conditions}`,
+        rates: [
+          `EUR/ALL: ${(100.20 + Math.random() * 0.1).toFixed(2)}`,
+          `USD/ALL: ${(91.45 + Math.random() * 0.1).toFixed(2)}`,
+          `CHF/ALL: ${(104.80 + Math.random() * 0.1).toFixed(2)}`,
+          `GBP/ALL: ${(116.10 + Math.random() * 0.1).toFixed(2)}`,
+          `Kursi i Këmbimit ALL`
+        ]
+      });
+    };
+
+    fetchTickerInfo();
+    const interval = setInterval(fetchTickerInfo, 300000); // 5 mins
+    return () => clearInterval(interval);
+  }, []);
+
+  // Sync news items
   const getDynamicStyles = (headline: string) => {
     const hLen = headline.length;
     
@@ -206,13 +235,17 @@ export default function LiveOutput() {
         </div>
 
         {/* Lower Thirds & Ticker */}
-        <div className="h-16 flex items-center bg-brand-red text-white relative z-30 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] -mx-8">
-           <div className="bg-black px-10 h-full flex items-center font-black italic text-sm tracking-tighter uppercase whitespace-nowrap border-r border-white/20">
-             Lajmet e Ditës
+        <div className="h-20 flex items-center bg-white text-black relative z-30 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] -mx-8 overflow-hidden">
+           <div className="bg-brand-red px-12 h-full flex items-center font-black italic text-lg tracking-tighter uppercase whitespace-nowrap border-r-4 border-black/10 text-white skew-x-[-15deg] -translate-x-4">
+             <span className="skew-x-[15deg]">Info Shërbime</span>
            </div>
-           <NewsTicker items={newsItems} />
-           <div className="h-full px-8 flex items-center bg-black/40 backdrop-blur-xl border-l border-white/10 shrink-0">
-             <span className="text-[10px] font-black tracking-widest text-white/70 uppercase">@ShkodraPolitike</span>
+           <NewsTicker items={[
+             tickerData.weather,
+             ...tickerData.rates,
+             "Info Shërbime LIVE"
+           ]} />
+           <div className="h-full px-10 flex items-center bg-black text-white shrink-0 skew-x-[-15deg] translate-x-4">
+             <span className="skew-x-[15deg] text-xs font-black tracking-widest uppercase">@ShkodraPolitike</span>
            </div>
         </div>
       </div>
