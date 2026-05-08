@@ -9,7 +9,7 @@ import NewsTicker from './NewsTicker';
 import ClockWidget from './ClockWidget';
 import LowerThird from './LowerThird';
 import BroadcastBackground from './BroadcastBackground';
-import { Circle, Radio } from 'lucide-react';
+import { Circle, Radio, Facebook } from 'lucide-react';
 
 export default function LiveOutput() {
   const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
@@ -59,31 +59,67 @@ export default function LiveOutput() {
   const activeItem = newsItems[currentIndex];
   const [tickerData, setTickerData] = useState<{ weather: string; rates: string[] }>({
     weather: "Moti Shkodër: --",
-    rates: ["EUR/ALL: 100.25", "USD/ALL: 91.40", "CHF/ALL: 104.80", "GBP/ALL: 116.15"]
+    rates: ["EUR/LEK: --", "USD/LEK: --", "CHF/LEK: --", "GBP/LEK: --"]
   });
+
+  // Weather code mapping (WMO codes to Albanian)
+  const weatherMap: Record<number, string> = {
+    0: "Kthjellët", 1: "Kthjellët", 2: "Me re", 3: "Vrenjtur",
+    45: "Mjegull", 48: "Mjegull", 51: "Drizë", 53: "Drizë", 55: "Drizë",
+    61: "Shi", 63: "Shi", 65: "Shi i dendur", 71: "Borë", 73: "Borë", 75: "Borë",
+    80: "Rrebesh", 81: "Rrebesh", 82: "Rrebesh", 95: "Stuhi",
+  };
 
   // Fetch Ticker Info
   useEffect(() => {
     const fetchTickerInfo = async () => {
-      // Mocked weather for Shkodra (Real-time feeling)
-      const hours = new Date().getHours();
-      const temp = 16 + Math.floor(Math.random() * 5);
-      const conditions = hours > 19 || hours < 6 ? "Kthellët" : "Diell";
-      
-      setTickerData({
-        weather: `Moti në Shkodër: ${temp}°C ${conditions}`,
-        rates: [
-          `EUR/ALL: ${(100.20 + Math.random() * 0.1).toFixed(2)}`,
-          `USD/ALL: ${(91.45 + Math.random() * 0.1).toFixed(2)}`,
-          `CHF/ALL: ${(104.80 + Math.random() * 0.1).toFixed(2)}`,
-          `GBP/ALL: ${(116.10 + Math.random() * 0.1).toFixed(2)}`,
-          `Kursi i Këmbimit ALL`
-        ]
-      });
+      try {
+        // 1. Fetch Weather (Open-Meteo for Shkodra)
+        const weatherRes = await fetch(
+          "https://api.open-meteo.com/v1/forecast?latitude=42.0683&longitude=19.5011&current=temperature_2m,weather_code"
+        );
+        const weatherJson = await weatherRes.json();
+        const temp = Math.round(weatherJson.current.temperature_2m);
+        const code = weatherJson.current.weather_code;
+        const condition = weatherMap[code] || "I pastër";
+        const weatherStr = `Moti në Shkodër: ${temp}°C ${condition}`;
+
+        // 2. Fetch Exchange Rates (Relative to LEK)
+        // Using open.er-api.com for free latest rates
+        const rateRes = await fetch("https://open.er-api.com/v6/latest/ALL");
+        const rateJson = await rateRes.json();
+        
+        if (rateJson.result === "success") {
+          const rates = rateJson.rates;
+          // We want Price of 1 unit in LEK, so we calculate 1 / (rate_of_unit_in_ALL)
+          // Wait, rateJson.rates[EUR] is units of EUR per 1 ALL.
+          // So price of 1 EUR in ALL is 1 / rates[EUR]
+          const getPriceInLek = (code: string) => {
+            const rate = rates[code];
+            if (!rate) return "--";
+            return (1 / rate).toFixed(2);
+          };
+
+          setTickerData({
+            weather: weatherStr,
+            rates: [
+              `EUR/LEK: ${getPriceInLek('EUR')}`,
+              `USD/LEK: ${getPriceInLek('USD')}`,
+              `CHF/LEK: ${getPriceInLek('CHF')}`,
+              `GBP/LEK: ${getPriceInLek('GBP')}`,
+              `Kursi Zyrtar i Këmbimit (LEK)`
+            ]
+          });
+        } else {
+          setTickerData(prev => ({ ...prev, weather: weatherStr }));
+        }
+      } catch (error) {
+        console.error('Ticker fetch error:', error);
+      }
     };
 
     fetchTickerInfo();
-    const interval = setInterval(fetchTickerInfo, 300000); // 5 mins
+    const interval = setInterval(fetchTickerInfo, 600000); // 10 mins for real data efficiency
     return () => clearInterval(interval);
   }, []);
 
@@ -235,8 +271,8 @@ export default function LiveOutput() {
         </div>
 
         {/* Lower Thirds & Ticker */}
-        <div className="h-20 flex items-center bg-white text-black relative z-30 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] -mx-8 overflow-hidden">
-           <div className="bg-brand-red px-12 h-full flex items-center font-black italic text-lg tracking-tighter uppercase whitespace-nowrap border-r-4 border-black/10 text-white skew-x-[-15deg] -translate-x-4">
+        <div className="h-24 flex items-center bg-white text-black relative z-30 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] -mx-8 overflow-hidden">
+           <div className="bg-brand-red px-14 h-full flex items-center font-black italic text-3xl tracking-tighter uppercase whitespace-nowrap border-r-8 border-black/10 text-white skew-x-[-15deg] -translate-x-6">
              <span className="skew-x-[15deg]">Info Shërbime</span>
            </div>
            <NewsTicker items={[
@@ -244,8 +280,14 @@ export default function LiveOutput() {
              ...tickerData.rates,
              "Info Shërbime LIVE"
            ]} />
-           <div className="h-full px-10 flex items-center bg-black text-white shrink-0 skew-x-[-15deg] translate-x-4">
-             <span className="skew-x-[15deg] text-xs font-black tracking-widest uppercase">@ShkodraPolitike</span>
+           <div className="h-full px-12 flex items-center bg-[#1877F2] text-white shrink-0 skew-x-[-15deg] translate-x-6 border-l-8 border-white/20">
+             <div className="skew-x-[15deg] flex flex-col items-start gap-0">
+               <div className="flex items-center gap-2">
+                 <Facebook size={24} fill="white" />
+                 <span className="text-[12px] font-black tracking-widest uppercase opacity-80">Na ndiqni</span>
+               </div>
+               <span className="text-2xl font-black tracking-tighter uppercase">/shkodrapolitike</span>
+             </div>
            </div>
         </div>
       </div>
