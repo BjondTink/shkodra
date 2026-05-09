@@ -21,5 +21,4 @@ export interface AppStatus {
   activeItemId: string | null;
   isPlaying: boolean;
   lastUpdated: number; // timestamp
-  forceResetTime?: number;
 }
