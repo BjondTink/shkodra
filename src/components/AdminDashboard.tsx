@@ -244,6 +244,11 @@ function SortableItem({ item, onEdit, onDelete }: { item: NewsItem; onEdit: () =
              </span>
            )}
            <span className="text-[9px] font-bold opacity-30">{item.duration}s</span>
+           {item.publishedTime && (
+             <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/10">
+               {item.publishedTime}
+             </span>
+           )}
         </div>
         <h3 className="text-lg font-bold truncate leading-tight">{item.headline}</h3>
         <p className="text-xs text-white/40 truncate italic">{item.scrollingText}</p>

@@ -9,6 +9,7 @@ export interface NewsItem {
   mediaType: MediaType;
   duration: number; // in seconds
   isBreakingNews: boolean;
+  publishedTime?: string;
   order: number;
   createdAt: string;
   updatedAt: string;

@@ -205,7 +205,19 @@ export default function LiveOutput() {
                           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
                           className="flex flex-col gap-12 py-10"
                         >
-                           <div className="border-l-8 border-brand-red pl-10 flex flex-col gap-10">
+                           <div className="border-l-8 border-brand-red pl-10 flex flex-col gap-6">
+                             <div className="flex items-center gap-4 mb-4">
+                               <div className="bg-brand-red px-5 py-2 rounded-lg text-xl font-black italic text-white uppercase tracking-[0.2em] skew-x-[-15deg] shadow-[0_0_20px_rgba(220,38,38,0.4)]">
+                                 <span className="skew-x-[15deg] block">
+                                   {activeItem.publishedTime || (() => {
+                                      if (!activeItem.createdAt) return 'TANI';
+                                      const date = (activeItem.createdAt as any).toDate ? (activeItem.createdAt as any).toDate() : new Date(activeItem.createdAt);
+                                      return date.toLocaleTimeString('sq-AL', { hour: '2-digit', minute: '2-digit' });
+                                   })()}
+                                 </span>
+                               </div>
+                               <div className="h-1 w-24 bg-white/10 rounded-full" />
+                             </div>
                              {(activeItem.headlines && activeItem.headlines.length > 0) ? (
                                activeItem.headlines.map((headline, idx) => (
                                  <motion.h2 

@@ -23,6 +23,7 @@ export default function NewsItemForm({ initialData, nextOrder, onClose }: Props)
     mediaType: (initialData?.mediaType || 'image') as MediaType,
     duration: initialData?.duration || 10,
     isBreakingNews: initialData?.isBreakingNews || false,
+    publishedTime: initialData?.publishedTime || new Date().toLocaleTimeString('sq-AL', { hour: '2-digit', minute: '2-digit' }),
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -169,23 +170,32 @@ export default function NewsItemForm({ initialData, nextOrder, onClose }: Props)
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
-                   <label className="text-[10px] font-black uppercase tracking-widest text-white/30 block mb-2">Lloji</label>
+                   <label className="text-[10px] font-black uppercase tracking-widest text-white/30 block mb-2">Ora (HH:MM)</label>
+                   <input 
+                     type="text" 
+                     value={formData.publishedTime}
+                     onChange={e => setFormData({...formData, publishedTime: e.target.value})}
+                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 focus:outline-none focus:border-brand-red font-bold text-center"
+                   />
+                </div>
+                <div>
+                   <label className="text-[10px] font-black uppercase tracking-widest text-white/30 block mb-2">Lloji Media</label>
                    <div className="flex bg-white/5 rounded-xl p-1 border border-white/10">
                       <button 
                         type="button" 
                         onClick={() => setFormData({...formData, mediaType: 'image'})}
-                        className={cn("flex-1 py-2 flex items-center justify-center gap-2 rounded-lg text-xs font-bold transition-all", formData.mediaType === 'image' ? 'bg-white text-black' : 'text-white/40')}
+                        className={cn("flex-1 py-2 flex items-center justify-center gap-2 rounded-lg text-[10px] font-bold transition-all", formData.mediaType === 'image' ? 'bg-white text-black' : 'text-white/40')}
                       >
-                        <ImageIcon size={14} /> Foto
+                        <ImageIcon size={12} /> Foto
                       </button>
                       <button 
                         type="button" 
                         onClick={() => setFormData({...formData, mediaType: 'video'})}
-                        className={cn("flex-1 py-2 flex items-center justify-center gap-2 rounded-lg text-xs font-bold transition-all", formData.mediaType === 'video' ? 'bg-white text-black' : 'text-white/40')}
+                        className={cn("flex-1 py-2 flex items-center justify-center gap-2 rounded-lg text-[10px] font-bold transition-all", formData.mediaType === 'video' ? 'bg-white text-black' : 'text-white/40')}
                       >
-                        <VideoIcon size={14} /> Video
+                        <VideoIcon size={12} /> Video
                       </button>
                    </div>
                 </div>
