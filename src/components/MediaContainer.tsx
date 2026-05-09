@@ -5,10 +5,12 @@ import { MediaType } from '../types';
 interface Props {
   url: string;
   type: MediaType;
+  source?: string;
+  isBreakingNews?: boolean;
   key?: React.Key;
 }
 
-export default function MediaContainer({ url, type }: Props) {
+export default function MediaContainer({ url, type, source, isBreakingNews }: Props) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -41,17 +43,33 @@ export default function MediaContainer({ url, type }: Props) {
         />
       )}
       
-      <div className="absolute top-6 left-6 z-20 flex flex-col gap-2">
-        <span className="bg-black/80 backdrop-blur-xl border border-white/20 px-3 py-1 rounded text-[10px] font-black uppercase tracking-widest text-white">
-          Burimi: Lajme Live
-        </span>
-      </div>
+      {source && (
+        <div className="absolute top-6 left-6 z-20 flex flex-col gap-2">
+          <span className="bg-black/80 backdrop-blur-xl border border-white/20 px-3 py-1 rounded text-[10px] font-black uppercase tracking-widest text-white shadow-xl">
+            {source}
+          </span>
+        </div>
+      )}
 
-      <div className="absolute bottom-6 left-6 z-20">
-         <div className="inline-block bg-brand-red text-white px-4 py-1 mb-2 font-black uppercase text-[10px] tracking-widest shadow-lg">
-           Mbulim Special
-         </div>
-      </div>
+      {isBreakingNews && (
+        <div className="absolute bottom-0 left-0 right-0 z-30">
+          <div className="bg-brand-red py-4 px-10 flex items-center justify-between border-t-4 border-white/10 shadow-[0_-20px_50px_rgba(220,38,38,0.5)]">
+            <div className="flex items-center gap-6 overflow-hidden">
+              <span className="text-4xl font-black italic uppercase tracking-tighter text-white whitespace-nowrap animate-pulse">
+                LAJMI I FUNDIT
+              </span>
+              <div className="h-2 w-32 bg-white/30 rounded-full shrink-0" />
+              <span className="text-4xl font-black italic uppercase tracking-tighter text-white whitespace-nowrap opacity-40">
+                LAJMI I FUNDIT
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-white rounded-full animate-ping" />
+              <div className="w-3 h-3 bg-white rounded-full" />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Viewport Corners */}
       <div className="absolute top-0 left-0 w-8 h-8 border-t border-l border-white/10 z-20" />

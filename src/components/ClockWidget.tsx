@@ -1,5 +1,17 @@
 import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
+import { 
+  Sun, 
+  Cloud, 
+  CloudSun, 
+  CloudFog, 
+  CloudDrizzle, 
+  CloudRain, 
+  Snowflake, 
+  CloudLightning, 
+  SunDim,
+  LucideIcon
+} from 'lucide-react';
 
 const monthsAl = [
   'Janar', 'Shkurt', 'Mars', 'Prill', 'Maj', 'Qershor',
@@ -8,7 +20,20 @@ const monthsAl = [
 
 export default function ClockWidget() {
   const [now, setNow] = useState(new Date());
-  const [weather, setWeather] = useState<{ temp: number; condition: string }>({ temp: 12, condition: 'Kthjellët' });
+  const [weather, setWeather] = useState<{ temp: number; condition: string; code: number }>({ 
+    temp: 12, 
+    condition: 'Kthjellët',
+    code: 0
+  });
+
+  const weatherIconMap: Record<number, LucideIcon> = {
+    0: Sun, 1: SunDim, 2: CloudSun, 3: Cloud,
+    45: CloudFog, 48: CloudFog, 51: CloudDrizzle, 53: CloudDrizzle, 55: CloudDrizzle,
+    61: CloudRain, 63: CloudRain, 65: CloudRain, 71: Snowflake, 73: Snowflake, 75: Snowflake,
+    80: CloudRain, 81: CloudRain, 82: CloudRain, 95: CloudLightning,
+  };
+
+  const WeatherIcon = weatherIconMap[weather.code] || Cloud;
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
@@ -34,6 +59,7 @@ export default function ClockWidget() {
 
         setWeather({
           temp,
+          code,
           condition: weatherMap[code] || "I pastër"
         });
       } catch (e) {
@@ -62,11 +88,17 @@ export default function ClockWidget() {
         </div>
       </div>
       
-      <div className="flex flex-col items-center gap-0 bg-white/10 px-6 py-3 rounded-xl border border-white/20 shadow-xl backdrop-blur-md">
-        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/50 mb-1">Shkodër</span>
-        <div className="flex items-center gap-2">
-          <span className="text-3xl font-black">{weather.temp}°C</span>
-          <span className="text-[10px] font-black uppercase text-brand-red rotate-90 origin-left translate-x-1 whitespace-nowrap">
+      <div className="flex items-center gap-4 bg-white/10 px-6 py-4 rounded-2xl border border-white/20 shadow-2xl backdrop-blur-xl">
+        <div className="flex flex-col items-start gap-0.5">
+          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Shkodër</span>
+          <span className="text-3xl font-black tabular-nums">{weather.temp}°C</span>
+        </div>
+        
+        <div className="h-10 w-px bg-white/10" />
+        
+        <div className="flex flex-col items-center gap-1">
+          <WeatherIcon size={28} className="text-brand-red drop-shadow-[0_0_8px_rgba(220,38,38,0.4)]" strokeWidth={3} />
+          <span className="text-[8px] font-black uppercase text-white/60 tracking-widest">
             {weather.condition}
           </span>
         </div>

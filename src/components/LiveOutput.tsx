@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { collection, onSnapshot, query, orderBy, doc } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { NewsItem, AppStatus } from '../types';
 import { cn } from '../lib/utils';
@@ -9,7 +9,21 @@ import NewsTicker from './NewsTicker';
 import ClockWidget from './ClockWidget';
 import LowerThird from './LowerThird';
 import BroadcastBackground from './BroadcastBackground';
-import { Circle, Radio, Facebook } from 'lucide-react';
+import { 
+  Circle, 
+  Radio, 
+  Facebook,
+  Sun, 
+  Cloud, 
+  CloudSun, 
+  CloudFog, 
+  CloudDrizzle, 
+  CloudRain, 
+  Snowflake, 
+  CloudLightning, 
+  SunDim,
+  LucideIcon
+} from 'lucide-react';
 
 export default function LiveOutput() {
   const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
@@ -44,11 +58,49 @@ export default function LiveOutput() {
       return;
     }
 
-    const currentItem = newsItems[currentIndex];
-    const duration = (currentItem?.duration || 10) * 1000;
+    // BREAKING NEWS EXPIRATION & FILTERING
+    const now = new Date();
+    const breakingItems = newsItems.filter(item => {
+      if (!item.isBreakingNews) return false;
+      
+      // Check for 5-minute expiration
+      if (item.breakingNewsStartedAt) {
+        const startTime = new Date(item.breakingNewsStartedAt).getTime();
+        const diffMinutes = (now.getTime() - startTime) / 60000;
+        
+        if (diffMinutes >= 5) {
+          // Auto-expire in Firestore
+          updateDoc(doc(db, 'newsItems', item.id), {
+            isBreakingNews: false,
+            breakingNewsStartedAt: ''
+          }).catch(err => console.error("Auto-expire error:", err));
+          return false; // Treat as normal for this tick
+        }
+      }
+      return true;
+    });
+
+    const itemsToCycle = breakingItems.length > 0 ? breakingItems : newsItems;
+    
+    // Find correctly mapped index in the target cycle
+    const currentItemOriginal = newsItems[currentIndex];
+    let activeInCycleIndex = itemsToCycle.findIndex(i => i.id === currentItemOriginal?.id);
+    
+    // If current item is not in the cycle (e.g. we just switched to breaking-priority)
+    if (activeInCycleIndex === -1) {
+      activeInCycleIndex = 0;
+      setCurrentIndex(newsItems.findIndex(i => i.id === itemsToCycle[0].id));
+      return;
+    }
+
+    const currentItem = itemsToCycle[activeInCycleIndex];
+    // Breaking News stays 20s, Normal stay user-defined duration
+    const duration = (currentItem?.isBreakingNews ? 20 : (currentItem?.duration || 10)) * 1000;
 
     timerRef.current = setTimeout(() => {
-      setCurrentIndex((prev) => (prev + 1) % newsItems.length);
+      const nextInCycle = (activeInCycleIndex + 1) % itemsToCycle.length;
+      const nextOriginalIndex = newsItems.findIndex(i => i.id === itemsToCycle[nextInCycle].id);
+      setCurrentIndex(nextOriginalIndex);
     }, duration);
 
     return () => {
@@ -57,7 +109,7 @@ export default function LiveOutput() {
   }, [currentIndex, newsItems, status]);
 
   const activeItem = newsItems[currentIndex];
-  const [tickerData, setTickerData] = useState<{ weather: string; rates: string[] }>({
+  const [tickerData, setTickerData] = useState<{ weather: React.ReactNode; rates: string[] }>({
     weather: "Moti Shkodër: --",
     rates: ["EUR/LEK: --", "USD/LEK: --", "CHF/LEK: --", "GBP/LEK: --"]
   });
@@ -68,6 +120,13 @@ export default function LiveOutput() {
     45: "Mjegull", 48: "Mjegull", 51: "Drizë", 53: "Drizë", 55: "Drizë",
     61: "Shi", 63: "Shi", 65: "Shi i dendur", 71: "Borë", 73: "Borë", 75: "Borë",
     80: "Rrebesh", 81: "Rrebesh", 82: "Rrebesh", 95: "Stuhi",
+  };
+
+  const weatherIconMap: Record<number, LucideIcon> = {
+    0: Sun, 1: SunDim, 2: CloudSun, 3: Cloud,
+    45: CloudFog, 48: CloudFog, 51: CloudDrizzle, 53: CloudDrizzle, 55: CloudDrizzle,
+    61: CloudRain, 63: CloudRain, 65: CloudRain, 71: Snowflake, 73: Snowflake, 75: Snowflake,
+    80: CloudRain, 81: CloudRain, 82: CloudRain, 95: CloudLightning,
   };
 
   // Fetch Ticker Info
@@ -82,7 +141,14 @@ export default function LiveOutput() {
         const temp = Math.round(weatherJson.current.temperature_2m);
         const code = weatherJson.current.weather_code;
         const condition = weatherMap[code] || "I pastër";
-        const weatherStr = `Moti në Shkodër: ${temp}°C ${condition}`;
+        const WeatherIcon = weatherIconMap[code] || Cloud;
+
+        const weatherNode = (
+          <div className="flex items-center gap-3">
+            <WeatherIcon size={32} className="text-brand-red" strokeWidth={3} />
+            <span>Moti Shkodër: {temp}°C {condition}</span>
+          </div>
+        );
 
         // 2. Fetch Exchange Rates (Relative to LEK)
         // Using open.er-api.com for free latest rates
@@ -91,9 +157,6 @@ export default function LiveOutput() {
         
         if (rateJson.result === "success") {
           const rates = rateJson.rates;
-          // We want Price of 1 unit in LEK, so we calculate 1 / (rate_of_unit_in_ALL)
-          // Wait, rateJson.rates[EUR] is units of EUR per 1 ALL.
-          // So price of 1 EUR in ALL is 1 / rates[EUR]
           const getPriceInLek = (code: string) => {
             const rate = rates[code];
             if (!rate) return "--";
@@ -101,17 +164,17 @@ export default function LiveOutput() {
           };
 
           setTickerData({
-            weather: weatherStr,
+            weather: weatherNode,
             rates: [
               `EUR/LEK: ${getPriceInLek('EUR')}`,
               `USD/LEK: ${getPriceInLek('USD')}`,
               `CHF/LEK: ${getPriceInLek('CHF')}`,
               `GBP/LEK: ${getPriceInLek('GBP')}`,
-              `Kursi Zyrtar i Këmbimit (LEK)`
+              `Kursi Zyrtar (LEK)`
             ]
           });
         } else {
-          setTickerData(prev => ({ ...prev, weather: weatherStr }));
+          setTickerData(prev => ({ ...prev, weather: weatherNode }));
         }
       } catch (error) {
         console.error('Ticker fetch error:', error);
@@ -119,7 +182,7 @@ export default function LiveOutput() {
     };
 
     fetchTickerInfo();
-    const interval = setInterval(fetchTickerInfo, 600000); // 10 mins for real data efficiency
+    const interval = setInterval(fetchTickerInfo, 600000); 
     return () => clearInterval(interval);
   }, []);
 
@@ -177,6 +240,8 @@ export default function LiveOutput() {
                   key={activeItem.id}
                   url={activeItem.mediaUrl}
                   type={activeItem.mediaType}
+                  source={activeItem.source}
+                  isBreakingNews={activeItem.isBreakingNews}
                 />
               )}
             </AnimatePresence>
@@ -249,9 +314,8 @@ export default function LiveOutput() {
                            {/* Decorative Ghost Items for Depth */}
                            <div className="space-y-8 opacity-5 pointer-events-none">
                               {newsItems.filter(i => i.id !== activeItem.id).slice(0, 1).map(item => (
-                                <div key={`ghost-${item.id}`} className="border-l-4 border-white/20 pl-8 py-2">
-                                  <h3 className="font-black text-3xl leading-tight mb-2 uppercase tracking-wide">{item.headline}</h3>
-                                  <p className="text-xl font-bold line-clamp-1">{item.scrollingText}</p>
+                                <div key={`ghost-${item.id}`} className="border-l-4 border-white/20 pl-8 py-4">
+                                  <h3 className="font-black text-3xl leading-tight mb-2 uppercase tracking-wide opacity-20">{item.headline}</h3>
                                 </div>
                               ))}
                            </div>
@@ -260,24 +324,7 @@ export default function LiveOutput() {
                    </AnimatePresence>
                 </div>
 
-                <div className="mt-auto absolute bottom-6 left-6 right-6">
-                  {activeItem?.isBreakingNews && (
-                    <motion.div 
-                      initial={{ y: 20, opacity: 0 }}
-                      animate={{ y: 0, opacity: 1 }}
-                      className="p-4 bg-gradient-to-br from-red-600/20 to-transparent rounded-xl border border-red-600/30"
-                    >
-                      <div className="flex items-center gap-3 mb-1">
-                        <span className="flex h-2 w-2 relative">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                        </span>
-                        <span className="text-[10px] font-black uppercase tracking-widest text-red-500">Lajmi i Fundit</span>
-                      </div>
-                      <p className="text-sm font-bold leading-snug truncate">{activeItem.headline}</p>
-                    </motion.div>
-                  )}
-                </div>
+                <div className="mt-auto" />
              </div>
           </div>
         </div>
