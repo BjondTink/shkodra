@@ -58,28 +58,8 @@ export default function LiveOutput() {
       return;
     }
 
-    // BREAKING NEWS EXPIRATION & FILTERING
-    const now = new Date();
-    const breakingItems = newsItems.filter(item => {
-      if (!item.isBreakingNews) return false;
-      
-      // Check for 5-minute expiration
-      if (item.breakingNewsStartedAt) {
-        const startTime = new Date(item.breakingNewsStartedAt).getTime();
-        const diffMinutes = (now.getTime() - startTime) / 60000;
-        
-        if (diffMinutes >= 5) {
-          // Auto-expire in Firestore
-          updateDoc(doc(db, 'newsItems', item.id), {
-            isBreakingNews: false,
-            breakingNewsStartedAt: ''
-          }).catch(err => console.error("Auto-expire error:", err));
-          return false; // Treat as normal for this tick
-        }
-      }
-      return true;
-    });
-
+    // BREAKING NEWS FILTERING (Expiration handled by dedicated useEffect)
+    const breakingItems = newsItems.filter(item => item.isBreakingNews);
     const itemsToCycle = breakingItems.length > 0 ? breakingItems : newsItems;
     
     // Find correctly mapped index in the target cycle
@@ -89,7 +69,10 @@ export default function LiveOutput() {
     // If current item is not in the cycle (e.g. we just switched to breaking-priority)
     if (activeInCycleIndex === -1) {
       activeInCycleIndex = 0;
-      setCurrentIndex(newsItems.findIndex(i => i.id === itemsToCycle[0].id));
+      const targetIndex = newsItems.findIndex(i => i.id === itemsToCycle[0].id);
+      if (targetIndex !== -1) {
+        setCurrentIndex(targetIndex);
+      }
       return;
     }
 
@@ -100,13 +83,54 @@ export default function LiveOutput() {
     timerRef.current = setTimeout(() => {
       const nextInCycle = (activeInCycleIndex + 1) % itemsToCycle.length;
       const nextOriginalIndex = newsItems.findIndex(i => i.id === itemsToCycle[nextInCycle].id);
-      setCurrentIndex(nextOriginalIndex);
+      if (nextOriginalIndex !== -1) {
+        setCurrentIndex(nextOriginalIndex);
+      }
     }, duration);
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, [currentIndex, newsItems, status]);
+
+  // Dedicated Auto-Expiration Checker
+  useEffect(() => {
+    const checkExpiration = () => {
+      const now = new Date();
+      newsItems.forEach(item => {
+        if (item.isBreakingNews) {
+          // If for some reason it doesn't have a start time, set it now to start the 5-min clock
+          if (!item.breakingNewsStartedAt) {
+            updateDoc(doc(db, 'newsItems', item.id), {
+              breakingNewsStartedAt: new Date().toISOString()
+            }).catch(err => console.error("Set timestamp error:", err));
+            return;
+          }
+
+          const startTime = new Date(item.breakingNewsStartedAt).getTime();
+          const diffMinutes = (now.getTime() - startTime) / 60000;
+          
+          if (diffMinutes >= 5) {
+            console.log(`Auto-expiring breaking news: ${item.headline}`);
+            updateDoc(doc(db, 'newsItems', item.id), {
+              isBreakingNews: false,
+              breakingNewsStartedAt: ''
+            }).catch(err => console.error("Auto-expire error:", err));
+          }
+        }
+      });
+    };
+
+    const interval = setInterval(checkExpiration, 30000); // Check every 30 seconds
+    return () => clearInterval(interval);
+  }, [newsItems]);
+
+  // Handle Reset Signal
+  useEffect(() => {
+    if (status?.forceResetTime) {
+      setCurrentIndex(0);
+    }
+  }, [status?.forceResetTime]);
 
   const activeItem = newsItems[currentIndex];
   const [tickerData, setTickerData] = useState<{ weather: React.ReactNode; rates: string[] }>({
@@ -206,23 +230,29 @@ export default function LiveOutput() {
   const dynamicStyles = activeItem ? getDynamicStyles(activeItem.headline) : { hSize: "text-6xl" };
 
   return (
-    <div className="relative w-screen h-screen bg-[#020202] overflow-hidden flex items-center justify-center p-8 aspect-video select-none">
+    <div className="relative w-screen h-screen bg-[#020202] overflow-hidden flex items-center justify-center select-none overflow-x-hidden">
       <BroadcastBackground />
 
       {/* Main Broadcast Container (16:9) */}
-      <div className="relative z-10 w-full h-full flex flex-col gap-6">
+      <div 
+        className="relative z-10 w-full h-full flex flex-col gap-2 md:gap-6 p-4 md:p-8 overflow-hidden"
+        style={{
+          height: 'min(100svh, 56.25vw)',
+          width: 'min(100vw, 177.78svh)',
+        }}
+      >
         {/* Header */}
-        <div className="flex justify-between items-start">
-          <div className="flex items-center gap-6 bg-black/60 backdrop-blur-md px-10 py-5 rounded-2xl border border-white/10 shadow-2xl">
-            <div className="relative flex items-center gap-3">
-              <div className="absolute -left-2 -top-2 w-full h-full bg-red-600/30 blur-xl rounded-full animate-ping" />
-              <div className="bg-red-600 text-white text-sm font-black px-3 py-1 rounded-md flex items-center gap-2 uppercase tracking-[0.2em] shadow-[0_0_15px_rgba(220,38,38,0.5)]">
-                <div className="w-2 h-2 bg-white rounded-full animate-pulse shadow-[0_0_8px_white]" />
+        <div className="flex justify-between items-start shrink-0">
+          <div className="flex items-center gap-3 md:gap-6 bg-black/60 backdrop-blur-md px-4 md:px-10 py-2 md:py-5 rounded-xl md:rounded-2xl border border-white/10 shadow-2xl">
+            <div className="relative flex items-center gap-2">
+              <div className="absolute -left-1 -top-1 w-full h-full bg-red-600/30 blur-xl rounded-full animate-ping" />
+              <div className="bg-red-600 text-white text-[10px] md:text-sm font-black px-2 md:px-3 py-0.5 md:py-1 rounded-md flex items-center gap-1.5 md:gap-2 uppercase tracking-[0.1em] md:tracking-[0.2em] shadow-[0_0_15px_rgba(220,38,38,0.5)]">
+                <div className="w-1.5 md:w-2 h-1.5 md:h-2 bg-white rounded-full animate-pulse shadow-[0_0_8px_white]" />
                 Live
               </div>
             </div>
-            <div className="h-10 w-px bg-white/20" />
-            <h1 className="text-4xl font-black tracking-tighter uppercase italic drop-shadow-lg">
+            <div className="h-6 md:h-10 w-px bg-white/20" />
+            <h1 className="text-lg md:text-4xl font-black tracking-tighter uppercase italic drop-shadow-lg">
               Shkodra <span className="text-brand-red">Politike</span>
             </h1>
           </div>
@@ -231,7 +261,7 @@ export default function LiveOutput() {
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 min-h-0 flex gap-6">
+        <div className="flex-1 min-h-0 flex gap-3 md:gap-6">
           {/* Media Player - 62% per Editorial Design */}
           <div className="w-[62%] relative h-full">
             <AnimatePresence mode="wait">
@@ -249,17 +279,17 @@ export default function LiveOutput() {
 
           {/* Vertical News Area - 38% per Editorial Design */}
           <div className="w-[38%] flex flex-col h-full">
-             <div className="flex-1 glass-morphism rounded-2xl p-10 relative overflow-hidden">
-                <div className="flex items-center justify-between mb-8">
-                  <span className="text-xs font-black uppercase tracking-[0.3em] text-brand-red">Lajmet Kryesore</span>
-                  <div className="flex gap-1.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-white/40"></div>
-                    <div className="w-1.5 h-1.5 rounded-full bg-brand-red animate-pulse"></div>
-                    <div className="w-1.5 h-1.5 rounded-full bg-white/40"></div>
+             <div className="flex-1 glass-morphism rounded-xl md:rounded-2xl p-4 md:p-10 relative overflow-hidden flex flex-col">
+                <div className="flex items-center justify-between mb-4 md:mb-8 shrink-0">
+                  <span className="text-[8px] md:text-xs font-black uppercase tracking-[0.2em] md:tracking-[0.3em] text-brand-red">Lajmet Kryesore</span>
+                  <div className="flex gap-1">
+                    <div className="w-1 h-1 md:w-1.5 md:h-1.5 rounded-full bg-white/40"></div>
+                    <div className="w-1 h-1 md:w-1.5 md:h-1.5 rounded-full bg-brand-red animate-pulse"></div>
+                    <div className="w-1 h-1 md:w-1.5 md:h-1.5 rounded-full bg-white/40"></div>
                   </div>
                 </div>
                 
-                <div className="h-full relative">
+                <div className="flex-1 relative min-h-0">
                    <AnimatePresence mode="wait">
                       {activeItem && (
                         <motion.div
@@ -268,84 +298,80 @@ export default function LiveOutput() {
                           animate={{ opacity: 1, x: 0 }}
                           exit={{ opacity: 0, x: -50 }}
                           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                          className="flex flex-col gap-12 py-10"
+                          className="absolute inset-0 flex flex-col gap-4 md:gap-12 py-2 md:py-10"
                         >
-                           <div className="border-l-8 border-brand-red pl-10 flex flex-col gap-6">
-                             <div className="flex items-center gap-4 mb-4">
-                               <div className="bg-brand-red px-5 py-2 rounded-lg text-xl font-black italic text-white uppercase tracking-[0.2em] skew-x-[-15deg] shadow-[0_0_20px_rgba(220,38,38,0.4)]">
+                           <div className="border-l-4 md:border-l-8 border-brand-red pl-4 md:pl-10 flex flex-col gap-3 md:gap-6">
+                             <div className="flex items-center gap-2 md:gap-4 mb-2 md:mb-4 shrink-0">
+                               <div className="bg-brand-red px-2 md:px-5 py-0.5 md:py-2 rounded md:rounded-lg text-sm md:text-xl font-black italic text-white uppercase tracking-[0.1em] md:tracking-[0.2em] skew-x-[-15deg] shadow-[0_0_20px_rgba(220,38,38,0.4)]">
                                  <span className="skew-x-[15deg] block">
-                                   {activeItem.publishedTime || (() => {
-                                      if (!activeItem.createdAt) return 'TANI';
-                                      const date = (activeItem.createdAt as any).toDate ? (activeItem.createdAt as any).toDate() : new Date(activeItem.createdAt);
-                                      return date.toLocaleTimeString('sq-AL', { hour: '2-digit', minute: '2-digit' });
-                                   })()}
+                                   {activeItem.publishedTime || 'TANI'}
                                  </span>
                                </div>
-                               <div className="h-1 w-24 bg-white/10 rounded-full" />
+                               <div className="h-0.5 md:h-1 w-12 md:w-24 bg-white/10 rounded-full" />
                              </div>
-                             {(activeItem.headlines && activeItem.headlines.length > 0) ? (
-                               activeItem.headlines.map((headline, idx) => (
-                                 <motion.h2 
-                                   key={idx}
-                                   initial={{ opacity: 0, y: 20 }}
-                                   animate={{ opacity: 1 - (idx * 0.35), y: 0 }}
-                                   transition={{ delay: idx * 0.2, duration: 0.8 }}
-                                   className={cn(
-                                     "font-black leading-[1.02] text-white tracking-widest uppercase transition-all duration-500",
-                                     dynamicStyles.hSize,
-                                     idx === 0 ? "opacity-100" : 
-                                     idx === 1 ? "opacity-60" : 
-                                     idx === 2 ? "opacity-30" : "opacity-10"
-                                   )}
-                                 >
-                                   {headline}
-                                 </motion.h2>
-                               ))
-                             ) : (
-                               <h2 className={cn(
-                                 "font-black leading-[1.02] text-white tracking-widest uppercase transition-all duration-500",
-                                 dynamicStyles.hSize
-                               )}>
-                                 {activeItem.headline}
-                               </h2>
-                             )}
+                             <div className="overflow-hidden">
+                               {(activeItem.headlines && activeItem.headlines.length > 0) ? (
+                                 <div className="flex flex-col gap-2 md:gap-4">
+                                   {activeItem.headlines.slice(0, 3).map((headline, idx) => (
+                                     <motion.h2 
+                                       key={idx}
+                                       initial={{ opacity: 0, y: 10 }}
+                                       animate={{ opacity: 1 - (idx * 0.35), y: 0 }}
+                                       transition={{ delay: idx * 0.1, duration: 0.5 }}
+                                       className={cn(
+                                         "font-black leading-[1.1] md:leading-[1.02] text-white tracking-wider md:tracking-widest uppercase transition-all duration-500 line-clamp-2",
+                                         idx === 0 ? "text-xl sm:text-2xl md:text-4xl lg:text-5xl xl:text-6xl opacity-100" : 
+                                         idx === 1 ? "text-lg sm:text-xl md:text-3xl lg:text-4xl lg:text-5xl opacity-60" : 
+                                         "text-base sm:text-lg md:text-2xl lg:text-3xl lg:text-4xl opacity-30"
+                                       )}
+                                     >
+                                       {headline}
+                                     </motion.h2>
+                                   ))}
+                                 </div>
+                               ) : (
+                                 <h2 className={cn(
+                                   "font-black leading-[1.1] md:leading-[1.02] text-white tracking-wider md:tracking-widest uppercase transition-all duration-500 text-xl sm:text-2xl md:text-4xl lg:text-5xl xl:text-6xl",
+                                 )}>
+                                   {activeItem.headline}
+                                 </h2>
+                               )}
+                             </div>
                            </div>
                            
-                           {/* Decorative Ghost Items for Depth */}
-                           <div className="space-y-8 opacity-5 pointer-events-none">
-                              {newsItems.filter(i => i.id !== activeItem.id).slice(0, 1).map(item => (
-                                <div key={`ghost-${item.id}`} className="border-l-4 border-white/20 pl-8 py-4">
-                                  <h3 className="font-black text-3xl leading-tight mb-2 uppercase tracking-wide opacity-20">{item.headline}</h3>
-                                </div>
-                              ))}
+                           {/* Decorative Ghost - Hidden on small heights */}
+                           <div className="hidden lg:block space-y-8 opacity-5 pointer-events-none mt-auto">
+                               {newsItems.filter(i => i.id !== activeItem.id).slice(0, 1).map(item => (
+                                 <div key={`ghost-${item.id}`} className="border-l-4 border-white/20 pl-8 py-4">
+                                   <h3 className="font-black text-3xl leading-tight mb-2 uppercase tracking-wide opacity-20">{item.headline}</h3>
+                                 </div>
+                               ))}
                            </div>
                         </motion.div>
                       )}
                    </AnimatePresence>
                 </div>
-
-                <div className="mt-auto" />
              </div>
           </div>
         </div>
 
         {/* Lower Thirds & Ticker */}
-        <div className="h-24 flex items-center bg-white text-black relative z-30 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] -mx-8 overflow-hidden">
-           <div className="bg-brand-red px-14 h-full flex items-center font-black italic text-3xl tracking-tighter uppercase whitespace-nowrap border-r-8 border-black/10 text-white skew-x-[-15deg] -translate-x-6">
-             <span className="skew-x-[15deg]">Info Shërbime</span>
+        <div className="h-10 md:h-24 flex items-center bg-white text-black relative z-30 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] -mx-4 md:-mx-8 overflow-hidden shrink-0">
+           <div className="bg-brand-red px-6 md:px-14 h-full flex items-center font-black italic text-sm md:text-3xl tracking-tighter uppercase whitespace-nowrap border-r-4 md:border-r-8 border-black/10 text-white skew-x-[-15deg] -translate-x-3 md:-translate-x-6 shrink-0">
+             <span className="skew-x-[15deg] pr-2">Info Shërbime</span>
            </div>
            <NewsTicker items={[
              tickerData.weather,
              ...tickerData.rates,
              "Info Shërbime LIVE"
            ]} />
-           <div className="h-full px-12 flex items-center bg-[#1877F2] text-white shrink-0 skew-x-[-15deg] translate-x-6 border-l-8 border-white/20">
+           <div className="h-full px-4 md:px-12 flex items-center bg-[#1877F2] text-white shrink-0 skew-x-[-15deg] translate-x-3 md:translate-x-6 border-l-4 md:border-l-8 border-white/20">
              <div className="skew-x-[15deg] flex flex-col items-start gap-0">
-               <div className="flex items-center gap-2">
-                 <Facebook size={24} fill="white" />
-                 <span className="text-[12px] font-black tracking-widest uppercase opacity-80">Na ndiqni</span>
+               <div className="flex items-center gap-1 md:gap-2">
+                 <Facebook size={12} className="md:size-6" fill="white" />
+                 <span className="text-[8px] md:text-[12px] font-black tracking-widest uppercase opacity-80 leading-none">Na ndiqni</span>
                </div>
-               <span className="text-2xl font-black tracking-tighter uppercase">/shkodrapolitike</span>
+               <span className="text-xs md:text-2xl font-black tracking-tighter uppercase leading-none">/shkodrapolitike</span>
              </div>
            </div>
         </div>

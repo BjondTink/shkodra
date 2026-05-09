@@ -15,6 +15,7 @@ import {
   AlertCircle,
   User,
   Menu,
+  RotateCcw,
   X as CloseIcon
 } from 'lucide-react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
@@ -72,6 +73,15 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     });
   };
 
+  const resetBroadcast = () => {
+    if (!status) return;
+    updateDoc(doc(db, 'status', 'current'), {
+      isPlaying: true, // Start playing if it was paused
+      forceResetTime: Date.now(),
+      lastUpdated: serverTimestamp()
+    });
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('sp_admin_token');
     onLogout();
@@ -80,15 +90,15 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   return (
     <div className="h-screen bg-[#050505] text-white flex flex-col md:flex-row overflow-hidden">
       {/* Mobile Top Bar */}
-      <div className="md:hidden h-16 border-b border-white/5 bg-black/40 flex items-center justify-between px-4 shrink-0">
+      <div className="md:hidden h-20 border-b border-white/5 bg-black/40 flex items-center justify-between px-4 pt-4 shrink-0">
         <h1 className="text-xl font-black uppercase tracking-tighter italic leading-none">
           Shkodra <span className="text-brand-red">Politike</span>
         </h1>
         <button 
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className="p-2 bg-white/5 rounded-lg border border-white/10"
+          className="p-2.5 bg-white/5 rounded-lg border border-white/10"
         >
-          {isSidebarOpen ? <CloseIcon size={20} /> : <Menu size={20} />}
+          {isSidebarOpen ? <CloseIcon size={22} /> : <Menu size={22} />}
         </button>
       </div>
 
@@ -113,19 +123,29 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         </div>
 
         <div className="flex flex-col gap-2 mb-8 mt-12 md:mt-0">
-           <button 
-             onClick={() => { togglePlayback(); setIsSidebarOpen(false); }}
-             className={cn(
-               "flex items-center justify-between px-4 py-4 rounded-xl font-bold transition-all",
-               status?.isPlaying ? "bg-brand-red text-white" : "bg-white/5 text-white/60 hover:bg-white/10"
-             )}
-           >
-             <span className="flex items-center gap-2">
-               {status?.isPlaying ? <Play size={18} fill="currentColor" /> : <Pause size={18} fill="currentColor" />}
-               {status?.isPlaying ? 'Duke luajtur' : 'Ndalur'}
-             </span>
-             <div className={cn("w-2 h-2 rounded-full", status?.isPlaying ? "bg-white animate-pulse" : "bg-white/20")} />
-           </button>
+           <div className="flex gap-2">
+             <button 
+               onClick={() => { togglePlayback(); setIsSidebarOpen(false); }}
+               className={cn(
+                 "flex-1 flex items-center justify-between px-4 py-4 rounded-xl font-bold transition-all",
+                 status?.isPlaying ? "bg-brand-red text-white" : "bg-white/5 text-white/60 hover:bg-white/10"
+               )}
+             >
+               <span className="flex items-center gap-2">
+                 {status?.isPlaying ? <Play size={18} fill="currentColor" /> : <Pause size={18} fill="currentColor" />}
+                 {status?.isPlaying ? 'Duke luajtur' : 'Ndalur'}
+               </span>
+               <div className={cn("w-2 h-2 rounded-full", status?.isPlaying ? "bg-white animate-pulse" : "bg-white/20")} />
+             </button>
+             
+             <button 
+               onClick={() => { resetBroadcast(); setIsSidebarOpen(false); }}
+               className="px-4 py-4 rounded-xl bg-white/5 text-white/60 hover:bg-white/10 hover:text-white transition-all border border-white/5 flex items-center justify-center p-4 tooltip"
+               title="Rifillo nga fillimi (Reset)"
+             >
+               <RotateCcw size={18} />
+             </button>
+           </div>
            
            <a 
              href="?mode=live" 
@@ -174,7 +194,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
       {/* Main Area */}
       <div className="flex-1 flex flex-col overflow-hidden relative">
-        <header className="h-16 md:h-20 border-b border-white/5 flex items-center justify-between px-4 md:px-10 shrink-0 bg-black/20 backdrop-blur-sm">
+        <header className="h-24 md:h-20 border-b border-white/5 flex items-center justify-between px-4 md:px-10 shrink-0 bg-black/20 backdrop-blur-sm pt-8 md:pt-0">
            <div className="flex flex-col">
              <h2 className="text-lg md:text-xl font-black uppercase tracking-tight">Radha</h2>
              <span className="text-[9px] md:text-[10px] opacity-30 font-bold uppercase tracking-widest">{items.length} Lajme</span>
@@ -182,9 +202,9 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
            
            <button 
              onClick={() => {setShowAddForm(true); setEditingItem(null)}}
-             className="bg-white text-black font-black px-4 md:px-6 py-2 md:py-2.5 rounded-full text-[10px] md:text-xs uppercase tracking-widest hover:bg-brand-red hover:text-white transition-all shadow-xl flex items-center gap-2"
+             className="bg-white text-black font-black px-5 md:px-6 py-2.5 md:py-2.5 rounded-full text-[11px] md:text-xs uppercase tracking-widest hover:bg-brand-red hover:text-white transition-all shadow-xl flex items-center gap-2"
            >
-             <Plus size={14} /> <span className="hidden sm:inline">Lajm i Ri</span><span className="sm:hidden">SHTO</span>
+             <Plus size={16} /> <span className="hidden sm:inline">Lajm i Ri</span><span className="sm:hidden">SHTO</span>
            </button>
         </header>
 

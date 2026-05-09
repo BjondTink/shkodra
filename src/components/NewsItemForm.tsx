@@ -94,7 +94,7 @@ export default function NewsItemForm({ initialData, nextOrder, onClose }: Props)
 
   return (
     <div className="bg-[#111] md:border md:border-white/10 md:rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 h-full md:h-auto flex flex-col">
-      <div className="p-4 md:p-6 border-b border-white/5 flex items-center justify-between sticky top-0 bg-[#111] z-10">
+      <div className="h-24 md:h-auto p-4 md:p-6 md:pb-6 pt-10 md:pt-6 border-b border-white/5 flex items-center justify-between sticky top-0 bg-[#111] z-10">
         <h3 className="text-lg md:text-xl font-black uppercase tracking-tight">
           {initialData ? 'Redakto Lajmin' : 'Shto Lajm të Ri'}
         </h3>

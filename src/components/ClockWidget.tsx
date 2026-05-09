@@ -78,27 +78,27 @@ export default function ClockWidget() {
   const albanianDate = `${day} ${monthsAl[monthIdx]} ${year}`.toUpperCase();
 
   return (
-    <div className="flex items-center gap-10">
+    <div className="flex items-center gap-3 md:gap-10">
       <div className="text-right">
-        <div className="text-4xl font-mono leading-none tracking-tight tabular-nums font-black">
+        <div className="text-xl md:text-4xl font-mono leading-none tracking-tight tabular-nums font-black">
           {format(now, 'HH:mm')}<span className="text-brand-red animate-pulse">:</span>{format(now, 'ss')}
         </div>
-        <div className="text-sm uppercase tracking-widest text-white/60 font-black mt-1">
+        <div className="text-[8px] md:text-sm uppercase tracking-widest text-white/60 font-black mt-1">
           {albanianDate}
         </div>
       </div>
       
-      <div className="flex items-center gap-4 bg-white/10 px-6 py-4 rounded-2xl border border-white/20 shadow-2xl backdrop-blur-xl">
+      <div className="flex items-center gap-2 md:gap-4 bg-white/10 px-3 md:px-6 py-2 md:py-4 rounded-xl md:rounded-2xl border border-white/20 shadow-2xl backdrop-blur-xl">
         <div className="flex flex-col items-start gap-0.5">
-          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Shkodër</span>
-          <span className="text-3xl font-black tabular-nums">{weather.temp}°C</span>
+          <span className="text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em] text-white/40 leading-none">Shkodër</span>
+          <span className="text-xl md:text-3xl font-black tabular-nums leading-none">{weather.temp}°C</span>
         </div>
         
-        <div className="h-10 w-px bg-white/10" />
+        <div className="h-6 md:h-10 w-px bg-white/10" />
         
-        <div className="flex flex-col items-center gap-1">
-          <WeatherIcon size={28} className="text-brand-red drop-shadow-[0_0_8px_rgba(220,38,38,0.4)]" strokeWidth={3} />
-          <span className="text-[8px] font-black uppercase text-white/60 tracking-widest">
+        <div className="flex flex-col items-center gap-0.5">
+          <WeatherIcon size={18} className="md:size-7 text-brand-red drop-shadow-[0_0_8px_rgba(220,38,38,0.4)]" strokeWidth={3} />
+          <span className="text-[6px] md:text-[8px] font-black uppercase text-white/60 tracking-widest leading-none">
             {weather.condition}
           </span>
         </div>
