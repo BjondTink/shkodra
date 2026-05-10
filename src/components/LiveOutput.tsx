@@ -1,14 +1,16 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { collection, onSnapshot, query, orderBy, doc, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { NewsItem, AppStatus } from '../types';
+import { NewsItem, AppStatus, TVVideo, TVAd, TVLowerThird } from '../types';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import MediaContainer from './MediaContainer';
+import VideoPlayer from './VideoPlayer';
 import NewsTicker from './NewsTicker';
 import ClockWidget from './ClockWidget';
 import LowerThird from './LowerThird';
 import BroadcastBackground from './BroadcastBackground';
+import ReactPlayer from 'react-player';
 import { 
   Circle, 
   Radio, 
@@ -22,14 +24,27 @@ import {
   Snowflake, 
   CloudLightning, 
   SunDim,
+  AlertTriangle,
   LucideIcon
 } from 'lucide-react';
 
+
 export default function LiveOutput() {
   const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
+  const [videos, setVideos] = useState<TVVideo[]>([]);
   const [status, setStatus] = useState<AppStatus | null>(null);
+  const [activeAds, setActiveAds] = useState<TVAd[]>([]);
+  const [activeLT, setActiveLT] = useState<TVLowerThird[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Sync videos
+  useEffect(() => {
+    const q = query(collection(db, 'tvVideos'), orderBy('order', 'asc'));
+    return onSnapshot(q, (snapshot) => {
+      setVideos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TVVideo)));
+    });
+  }, []);
 
   // Sync news items
   useEffect(() => {
@@ -49,11 +64,38 @@ export default function LiveOutput() {
     });
   }, []);
 
-  // Slideshow Logic
+  // Sync TV Overlays
+  useEffect(() => {
+    const unsubAds = onSnapshot(collection(db, 'tvAds'), (snapshot) => {
+      setActiveAds(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TVAd)).filter(ad => ad.active));
+    });
+    const unsubLT = onSnapshot(collection(db, 'tvLowerThirds'), (snapshot) => {
+      setActiveLT(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TVLowerThird)).filter(lt => lt.active));
+    });
+    return () => { unsubAds(); unsubLT(); };
+  }, []);
+
+  const handleVideoEnd = async () => {
+    if (!status?.isPlaylistActive || videos.length === 0) return;
+    
+    const currentIndex = videos.findIndex(v => v.id === status.currentVideoId);
+    const nextIndex = (currentIndex + 1) % videos.length;
+    const nextVideo = videos[nextIndex];
+
+    if (nextVideo) {
+      await updateDoc(doc(db, 'status', 'current'), {
+        activeVideoUrl: nextVideo.url || '',
+        videoSource: nextVideo.type,
+        embedCode: nextVideo.embedCode || '',
+        currentVideoId: nextVideo.id,
+        lastUpdated: serverTimestamp()
+      });
+    }
+  };
   useEffect(() => {
     const isPlaying = status ? status.isPlaying : true;
 
-    if (newsItems.length === 0 || !isPlaying) {
+    if (newsItems.length === 0 || !isPlaying || status?.mode === 'video') {
       if (timerRef.current) clearTimeout(timerRef.current);
       return;
     }
@@ -250,18 +292,81 @@ export default function LiveOutput() {
         {/* Content Area */}
         <div className="flex-1 min-h-0 flex gap-6">
           {/* Media Player - 62% per Editorial Design */}
-          <div className="w-[62%] relative h-full">
+          <div className={cn(
+            "w-[62%] relative h-full rounded-2xl overflow-hidden shadow-2xl isolate",
+            status?.mode === 'video' ? "pointer-events-auto" : "pointer-events-none"
+          )}>
             <AnimatePresence mode="wait">
-              {activeItem && (
-                <MediaContainer 
-                  key={activeItem.id}
-                  url={activeItem.mediaUrl}
-                  type={activeItem.mediaType}
-                  source={activeItem.source}
-                  isBreakingNews={activeItem.isBreakingNews}
-                />
+              {status?.mode === 'video' ? (
+                <motion.div
+                  key={`video-container`}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="w-full h-full bg-black flex items-center justify-center relative overflow-hidden"
+                >
+                  <VideoPlayer status={status} onEnded={handleVideoEnd} />
+                  
+                  {/* Watermark/Overlay for Video Mode */}
+                  <div className="absolute top-4 left-4 bg-brand-red/90 text-white text-[10px] font-black px-3 py-1 rounded-md uppercase tracking-widest shadow-lg z-10 pointer-events-none">
+                    Transmetim i Drejtpërdrejtë
+                  </div>
+                </motion.div>
+              ) : (
+                activeItem && (
+                  <MediaContainer 
+                    key={activeItem.id}
+                    url={activeItem.mediaUrl}
+                    type={activeItem.mediaType}
+                    source={activeItem.source}
+                    isBreakingNews={activeItem.isBreakingNews}
+                  />
+                )
               )}
             </AnimatePresence>
+
+            {/* Overlays / Ads inside Media Container */}
+            <div className="absolute top-0 right-0 p-4 flex flex-col gap-4 pointer-events-none z-20">
+               <AnimatePresence>
+                 {activeAds.map(ad => (
+                   <motion.div
+                     key={ad.id}
+                     initial={{ opacity: 0, scale: 0.8, x: 50 }}
+                     animate={{ opacity: 1, scale: 1, x: 0 }}
+                     exit={{ opacity: 0, scale: 0.8, x: 50 }}
+                     className="w-48 aspect-video rounded-xl bg-black border border-white/20 overflow-hidden shadow-2xl"
+                   >
+                     <img src={ad.imageUrl} className="w-full h-full object-cover" />
+                   </motion.div>
+                 ))}
+               </AnimatePresence>
+            </div>
+
+            {/* Lower Thirds inside Media Container */}
+            <div className="absolute bottom-10 left-10 pointer-events-none z-20 w-full pr-20">
+               <AnimatePresence>
+                 {activeLT.map(lt => (
+                   <motion.div
+                     key={lt.id}
+                     initial={{ opacity: 0, x: -100 }}
+                     animate={{ opacity: 1, x: 0 }}
+                     exit={{ opacity: 0, x: -100 }}
+                     className="flex flex-col gap-0"
+                   >
+                     <div className="bg-brand-red px-10 py-3 shadow-2xl inline-block skew-x-[-15deg] -translate-x-4 border-l-8 border-white">
+                        <span className="skew-x-[15deg] block text-4xl font-black text-white uppercase tracking-tighter">
+                          {lt.title}
+                        </span>
+                     </div>
+                     <div className="bg-black/90 px-8 py-2 shadow-xl inline-block skew-x-[-15deg] border-l-4 border-brand-red">
+                        <span className="skew-x-[15deg] block text-lg font-bold text-white/80 uppercase tracking-widest">
+                          {lt.subtitle}
+                        </span>
+                     </div>
+                   </motion.div>
+                 ))}
+               </AnimatePresence>
+            </div>
           </div>
 
           {/* Vertical News Area - 38% per Editorial Design */}

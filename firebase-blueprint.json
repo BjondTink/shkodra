@@ -24,7 +24,46 @@
       "properties": {
         "activeItemId": { "type": "string" },
         "isPlaying": { "type": "boolean" },
-        "lastUpdated": { "type": "string", "format": "date-time" }
+        "lastUpdated": { "type": "string", "format": "date-time" },
+        "mode": { "type": "string", "enum": ["news", "video"] },
+        "activeVideoUrl": { "type": "string" },
+        "videoSource": { "type": "string", "enum": ["youtube", "facebook", "direct", "embed"] },
+        "embedCode": { "type": "string" },
+        "isPlaylistActive": { "type": "boolean" },
+        "currentVideoId": { "type": "string" },
+        "volume": { "type": "number" }
+      }
+    },
+    "tvVideo": {
+      "title": "TV Video",
+      "description": "A video in the TV playlist",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "url": { "type": "string" },
+        "type": { "type": "string", "enum": ["youtube", "facebook", "direct", "embed"] },
+        "embedCode": { "type": "string" },
+        "order": { "type": "number" }
+      }
+    },
+    "tvAd": {
+      "title": "TV Ad",
+      "description": "An advertisement image/overlay",
+      "type": "object",
+      "properties": {
+        "imageUrl": { "type": "string" },
+        "title": { "type": "string" },
+        "active": { "type": "boolean" }
+      }
+    },
+    "tvLowerThird": {
+      "title": "TV Lower Third",
+      "description": "A lower third overlay",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "subtitle": { "type": "string" },
+        "active": { "type": "boolean" }
       }
     }
   },
@@ -36,6 +75,18 @@
     "/status/current": {
       "schema": "appStatus",
       "description": "Singleton for current playback status"
+    },
+    "/tvVideos/{videoId}": {
+      "schema": "tvVideo",
+      "description": "Playlist of videos for the TV mode"
+    },
+    "/tvAds/{adId}": {
+      "schema": "tvAd",
+      "description": "Collection of advertisements"
+    },
+    "/tvLowerThirds/{ltId}": {
+      "schema": "tvLowerThird",
+      "description": "Collection of lower third templates"
     }
   }
 }

@@ -15,12 +15,15 @@ import {
   AlertCircle,
   User,
   Menu,
-  X as CloseIcon
+  X as CloseIcon,
+  Monitor,
+  Newspaper
 } from 'lucide-react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import NewsItemForm from './NewsItemForm';
+import TVDashboard from './TVDashboard';
 import { cn } from '../lib/utils';
 
 export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
@@ -29,6 +32,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [editingItem, setEditingItem] = useState<NewsItem | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'news' | 'tv'>('news');
 
   useEffect(() => {
     const q = query(collection(db, 'newsItems'), orderBy('order', 'asc'));
@@ -131,7 +135,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
              href="?mode=live" 
              target="_blank"
              rel="noreferrer"
-             className="flex items-center gap-2 px-4 py-4 rounded-xl bg-blue-600 hover:bg-blue-700 font-bold transition-all"
+             className="flex items-center gap-2 px-4 py-4 rounded-xl bg-blue-600 hover:bg-blue-700 font-bold transition-all text-center justify-center"
            >
              <ExternalLink size={18} />
              Hap Live Output (OBS)
@@ -139,22 +143,48 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         </div>
 
         <div className="flex-1">
+           <div className="text-[10px] text-white/30 font-black uppercase tracking-[0.2em] mb-4 text-center">Navigimi</div>
+           <nav className="flex flex-col gap-2 mb-8">
+              <button 
+                onClick={() => { setActiveTab('news'); setIsSidebarOpen(false); }}
+                className={cn(
+                  "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all",
+                  activeTab === 'news' ? "bg-white text-black" : "text-white/60 hover:bg-white/5"
+                )}
+              >
+                <Newspaper size={20} /> LAJMET
+              </button>
+              <button 
+                onClick={() => { setActiveTab('tv'); setIsSidebarOpen(false); }}
+                className={cn(
+                  "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all",
+                  activeTab === 'tv' ? "bg-brand-red text-white shadow-[0_0_20px_rgba(204,0,0,0.3)]" : "text-white/60 hover:bg-white/5"
+                )}
+              >
+                <Monitor size={20} /> TV BROADCAST
+              </button>
+           </nav>
+
+           <div className="h-px bg-white/5 my-6" />
+
            <div className="text-[10px] text-white/30 font-black uppercase tracking-[0.2em] mb-4">Mjetet e Adminit</div>
            <nav className="flex flex-col gap-1">
-             <button onClick={() => {setShowAddForm(true); setEditingItem(null); setIsSidebarOpen(false); }} className="flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium hover:bg-white/5 transition-all text-white/80">
-               <Plus size={18} className="text-brand-red" /> Shto Lajm të Ri
-             </button>
-             <div className="h-px bg-white/5 my-2" />
-             <div className="flex items-center gap-3 px-3 py-2 text-[10px] text-white/20 font-bold uppercase tracking-widest">
-               Kontrolli i Përdoruesit
+             {activeTab === 'news' && (
+               <button onClick={() => {setShowAddForm(true); setEditingItem(null); setIsSidebarOpen(false); }} className="flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium hover:bg-white/5 transition-all text-white/80">
+                 <Plus size={18} className="text-brand-red" /> Shto Lajm të Ri
+               </button>
+             )}
+             
+             <div className="flex items-center gap-3 px-3 py-2 text-[10px] text-white/20 font-bold uppercase tracking-widest mt-4">
+               Përdoruesi
              </div>
              <div className="px-3 py-2 flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-full border border-brand-red flex items-center justify-center bg-brand-red/10">
                   <User size={16} className="text-brand-red" />
                 </div>
-                <div className="flex flex-col">
-                  <span className="text-sm font-bold truncate max-w-[140px]">Super Admin</span>
-                  <span className="text-[10px] opacity-40 truncate max-w-[140px]">admin@shkodrapolitike.tv</span>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-sm font-bold truncate">Super Admin</span>
+                  <span className="text-[10px] opacity-40 truncate">admin@shkodrapolitike.tv</span>
                 </div>
              </div>
              <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-3 rounded-lg text-xs font-bold text-red-400 hover:bg-red-400/10 transition-all">
@@ -174,58 +204,64 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
       {/* Main Area */}
       <div className="flex-1 flex flex-col overflow-hidden relative">
-        <header className="h-24 md:h-20 border-b border-white/5 flex items-center justify-between px-4 md:px-10 shrink-0 bg-black/20 backdrop-blur-sm pt-8 md:pt-0">
-           <div className="flex flex-col">
-             <h2 className="text-2xl md:text-3xl font-black uppercase tracking-tight">Radha</h2>
-             <span className="text-[9px] md:text-[10px] opacity-30 font-bold uppercase tracking-widest">{items.length} Lajme</span>
-           </div>
-           
-           <button 
-             onClick={() => {setShowAddForm(true); setEditingItem(null)}}
-             className="bg-white text-black font-black px-5 md:px-6 py-2.5 md:py-2.5 rounded-full text-[11px] md:text-xs uppercase tracking-widest hover:bg-brand-red hover:text-white transition-all shadow-xl flex items-center gap-2"
-           >
-             <Plus size={16} /> <span className="hidden sm:inline">Lajm i Ri</span><span className="sm:hidden">SHTO</span>
-           </button>
-        </header>
+        {activeTab === 'news' ? (
+          <>
+            <header className="h-24 md:h-20 border-b border-white/5 flex items-center justify-between px-4 md:px-10 shrink-0 bg-black/20 backdrop-blur-sm pt-8 md:pt-0">
+               <div className="flex flex-col">
+                 <h2 className="text-2xl md:text-3xl font-black uppercase tracking-tight">Radha</h2>
+                 <span className="text-[9px] md:text-[10px] opacity-30 font-bold uppercase tracking-widest">{items.length} Lajme</span>
+               </div>
+               
+               <button 
+                 onClick={() => {setShowAddForm(true); setEditingItem(null)}}
+                 className="bg-white text-black font-black px-5 md:px-6 py-2.5 md:py-2.5 rounded-full text-[11px] md:text-xs uppercase tracking-widest hover:bg-brand-red hover:text-white transition-all shadow-xl flex items-center gap-2"
+               >
+                 <Plus size={16} /> <span className="hidden sm:inline">Lajm i Ri</span><span className="sm:hidden">SHTO</span>
+               </button>
+            </header>
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-10 bg-[radial-gradient(circle_at_50%_0%,rgba(204,0,0,0.05),transparent)]">
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={items} strategy={verticalListSortingStrategy}>
-              <div className="max-w-4xl mx-auto flex flex-col gap-3">
-                {items.map((item) => (
-                  <SortableItem 
-                    key={item.id} 
-                    item={item} 
-                    onEdit={() => {setEditingItem(item); setShowAddForm(true)}}
-                    onDelete={async () => {
-                      if (confirm('A jeni të sigurt?')) {
-                        await deleteDoc(doc(db, 'newsItems', item.id));
-                      }
-                    }}
-                  />
-                ))}
-                {items.length === 0 && (
-                  <div className="py-20 md:py-32 flex flex-col items-center justify-center opacity-20 border-2 border-dashed border-white/10 rounded-3xl">
-                     <AlertCircle size={40} className="mb-4" />
-                     <p className="font-bold uppercase tracking-widest text-center text-sm">Nuk ka lajme në radhë</p>
+            <main className="flex-1 overflow-y-auto p-4 md:p-10 bg-[radial-gradient(circle_at_50%_0%,rgba(204,0,0,0.05),transparent)]">
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={items} strategy={verticalListSortingStrategy}>
+                  <div className="max-w-4xl mx-auto flex flex-col gap-3">
+                    {items.map((item) => (
+                      <SortableItem 
+                        key={item.id} 
+                        item={item} 
+                        onEdit={() => {setEditingItem(item); setShowAddForm(true)}}
+                        onDelete={async () => {
+                          if (confirm('A jeni të sigurt?')) {
+                            await deleteDoc(doc(db, 'newsItems', item.id));
+                          }
+                        }}
+                      />
+                    ))}
+                    {items.length === 0 && (
+                      <div className="py-20 md:py-32 flex flex-col items-center justify-center opacity-20 border-2 border-dashed border-white/10 rounded-3xl">
+                         <AlertCircle size={40} className="mb-4" />
+                         <p className="font-bold uppercase tracking-widest text-center text-sm">Nuk ka lajme në radhë</p>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </SortableContext>
-          </DndContext>
-        </main>
+                </SortableContext>
+              </DndContext>
+            </main>
 
-        {/* Modal Overlay for Add/Edit Form */}
-        {showAddForm && (
-          <div className="fixed inset-0 z-[100] flex md:items-center justify-center p-0 md:p-8 bg-black/90 backdrop-blur-2xl overflow-y-auto">
-             <div className="max-w-2xl w-full h-full md:h-auto">
-                <NewsItemForm 
-                  initialData={editingItem} 
-                  nextOrder={items.length} 
-                  onClose={() => setShowAddForm(false)} 
-                />
-             </div>
-          </div>
+            {/* Modal Overlay for Add/Edit Form */}
+            {showAddForm && (
+              <div className="fixed inset-0 z-[100] flex md:items-center justify-center p-0 md:p-8 bg-black/90 backdrop-blur-2xl overflow-y-auto">
+                 <div className="max-w-2xl w-full h-full md:h-auto">
+                    <NewsItemForm 
+                      initialData={editingItem} 
+                      nextOrder={items.length} 
+                      onClose={() => setShowAddForm(false)} 
+                    />
+                 </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <TVDashboard />
         )}
       </div>
     </div>
