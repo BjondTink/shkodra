@@ -23,18 +23,24 @@ export interface AppStatus {
   lastUpdated: number; // timestamp
   mode: 'news' | 'video';
   activeVideoUrl?: string;
-  videoSource?: 'youtube' | 'facebook' | 'direct' | 'embed';
+  videoSource?: 'youtube' | 'facebook' | 'direct' | 'embed' | 'hls';
   embedCode?: string;
   isPlaylistActive?: boolean;
   currentVideoId?: string;
   volume?: number;
+  isMuted?: boolean;
+  loop?: boolean;
+  isShuffle?: boolean;
+  transportAction?: 'play' | 'pause' | 'stop' | 'restart' | 'next' | 'prev';
+  stationName?: string;
+  socialHandle?: string;
 }
 
 export interface TVVideo {
   id: string;
   title: string;
   url: string;
-  type: 'youtube' | 'facebook' | 'direct' | 'embed';
+  type: 'youtube' | 'facebook' | 'direct' | 'embed' | 'hls';
   embedCode?: string;
   order: number;
 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { NewsItem, AppStatus } from '../types';
+import { NewsItem, AppStatus, TVVideo, TVAd, TVLowerThird } from '../types';
 import { 
   Plus, 
   Trash2, 
@@ -28,6 +28,9 @@ import { cn } from '../lib/utils';
 
 export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [items, setItems] = useState<NewsItem[]>([]);
+  const [videos, setVideos] = useState<TVVideo[]>([]);
+  const [ads, setAds] = useState<TVAd[]>([]);
+  const [lowerThirds, setLowerThirds] = useState<TVLowerThird[]>([]);
   const [status, setStatus] = useState<AppStatus | null>(null);
   const [editingItem, setEditingItem] = useState<NewsItem | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -38,6 +41,25 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     const q = query(collection(db, 'newsItems'), orderBy('order', 'asc'));
     return onSnapshot(q, (snapshot) => {
       setItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NewsItem)));
+    });
+  }, []);
+
+  useEffect(() => {
+    const q = query(collection(db, 'tvVideos'), orderBy('order', 'asc'));
+    return onSnapshot(q, (snapshot) => {
+      setVideos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TVVideo)));
+    });
+  }, []);
+
+  useEffect(() => {
+    return onSnapshot(collection(db, 'tvAds'), (snapshot) => {
+      setAds(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TVAd)));
+    });
+  }, []);
+
+  useEffect(() => {
+    return onSnapshot(collection(db, 'tvLowerThirds'), (snapshot) => {
+      setLowerThirds(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TVLowerThird)));
     });
   }, []);
 
@@ -82,7 +104,10 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   };
 
   return (
-    <div className="h-screen bg-[#050505] text-white flex flex-col md:flex-row overflow-hidden">
+    <div className="h-screen bg-[#050505] text-white flex flex-col md:flex-row overflow-hidden relative">
+      <div className="absolute top-2 right-2 z-[9999] px-2 py-1 bg-green-500 text-[8px] font-bold rounded animate-pulse opacity-20 pointer-events-none">
+        ADMIN_READY: {activeTab}
+      </div>
       {/* Mobile Top Bar */}
       <div className="md:hidden h-24 border-b border-white/5 bg-black/40 flex items-center justify-between px-4 pt-6 shrink-0">
         <h1 className="text-3xl font-black uppercase tracking-tighter italic leading-none">
@@ -118,77 +143,83 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
         <div className="flex flex-col gap-2 mb-8 mt-12 md:mt-0">
            <button 
-             onClick={() => { togglePlayback(); setIsSidebarOpen(false); }}
+             onClick={() => { setActiveTab('news'); setIsSidebarOpen(false); }}
              className={cn(
-               "flex items-center justify-between px-4 py-4 rounded-xl font-bold transition-all",
-               status?.isPlaying ? "bg-brand-red text-white" : "bg-white/5 text-white/60 hover:bg-white/10"
+               "flex items-center gap-3 px-4 py-4 rounded-xl text-sm font-bold transition-all",
+               activeTab === 'news' ? "bg-white text-black" : "text-white/60 hover:bg-white/5"
              )}
            >
-             <span className="flex items-center gap-2">
-               {status?.isPlaying ? <Play size={18} fill="currentColor" /> : <Pause size={18} fill="currentColor" />}
-               {status?.isPlaying ? 'Duke luajtur' : 'Ndalur'}
-             </span>
-             <div className={cn("w-2 h-2 rounded-full", status?.isPlaying ? "bg-white animate-pulse" : "bg-white/20")} />
+             <Newspaper size={20} /> LAJMET
            </button>
-           
-           <a 
-             href="?mode=live" 
-             target="_blank"
-             rel="noreferrer"
-             className="flex items-center gap-2 px-4 py-4 rounded-xl bg-blue-600 hover:bg-blue-700 font-bold transition-all text-center justify-center"
+           <button 
+             onClick={() => { setActiveTab('tv'); setIsSidebarOpen(false); }}
+             className={cn(
+               "flex items-center gap-3 px-4 py-4 rounded-xl text-sm font-bold transition-all",
+               activeTab === 'tv' ? "bg-brand-red text-white shadow-[0_0_20px_rgba(204,0,0,0.3)]" : "text-white/60 hover:bg-white/5"
+             )}
            >
-             <ExternalLink size={18} />
-             Hap Live Output (OBS)
-           </a>
+             <Monitor size={20} /> TV BROADCAST
+           </button>
         </div>
 
         <div className="flex-1">
-           <div className="text-[10px] text-white/30 font-black uppercase tracking-[0.2em] mb-4 text-center">Navigimi</div>
-           <nav className="flex flex-col gap-2 mb-8">
-              <button 
-                onClick={() => { setActiveTab('news'); setIsSidebarOpen(false); }}
-                className={cn(
-                  "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all",
-                  activeTab === 'news' ? "bg-white text-black" : "text-white/60 hover:bg-white/5"
-                )}
-              >
-                <Newspaper size={20} /> LAJMET
-              </button>
-              <button 
-                onClick={() => { setActiveTab('tv'); setIsSidebarOpen(false); }}
-                className={cn(
-                  "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all",
-                  activeTab === 'tv' ? "bg-brand-red text-white shadow-[0_0_20px_rgba(204,0,0,0.3)]" : "text-white/60 hover:bg-white/5"
-                )}
-              >
-                <Monitor size={20} /> TV BROADCAST
-              </button>
-           </nav>
+           <div className="h-px bg-white/5 my-6" />
+           <div className="text-[10px] text-white/30 font-black uppercase tracking-[0.2em] mb-4">MJETET E ADMINIT</div>
+           
+           <div className="h-px bg-white/5 my-6" />
+           <div className="text-[10px] text-white/30 font-black uppercase tracking-[0.2em] mb-4">BRANDING</div>
+           
+           <div className="flex flex-col gap-4 mb-6">
+             <div className="flex flex-col gap-1.5">
+               <label className="text-[10px] text-white/40 font-bold uppercase tracking-wider">Emri i Stacionit (Logo)</label>
+               <input 
+                 type="text" 
+                 value={status?.stationName || "Shkodra Politike"}
+                 onChange={(e) => {
+                   updateDoc(doc(db, 'status', 'current'), {
+                     stationName: e.target.value,
+                     lastUpdated: serverTimestamp()
+                   });
+                 }}
+                 className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm font-bold focus:outline-none focus:border-white/30 transition-all"
+                 placeholder="Shkodra Politike"
+               />
+             </div>
+             
+             <div className="flex flex-col gap-1.5">
+               <label className="text-[10px] text-white/40 font-bold uppercase tracking-wider">Social Handle</label>
+               <input 
+                 type="text" 
+                 value={status?.socialHandle || "/shkodrapolitike"}
+                 onChange={(e) => {
+                   updateDoc(doc(db, 'status', 'current'), {
+                     socialHandle: e.target.value.startsWith('/') ? e.target.value : `/${e.target.value}`,
+                     lastUpdated: serverTimestamp()
+                   });
+                 }}
+                 className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm font-bold focus:outline-none focus:border-white/30 transition-all"
+                 placeholder="/shkodrapolitike"
+               />
+             </div>
+           </div>
 
            <div className="h-px bg-white/5 my-6" />
 
-           <div className="text-[10px] text-white/30 font-black uppercase tracking-[0.2em] mb-4">Mjetet e Adminit</div>
+           <div className="text-[10px] text-white/30 font-black uppercase tracking-[0.2em] mb-4">PËRDORUESI</div>
            <nav className="flex flex-col gap-1">
-             {activeTab === 'news' && (
-               <button onClick={() => {setShowAddForm(true); setEditingItem(null); setIsSidebarOpen(false); }} className="flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium hover:bg-white/5 transition-all text-white/80">
-                 <Plus size={18} className="text-brand-red" /> Shto Lajm të Ri
-               </button>
-             )}
-             
-             <div className="flex items-center gap-3 px-3 py-2 text-[10px] text-white/20 font-bold uppercase tracking-widest mt-4">
-               Përdoruesi
-             </div>
-             <div className="px-3 py-2 flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full border border-brand-red flex items-center justify-center bg-brand-red/10">
-                  <User size={16} className="text-brand-red" />
+             <div className="px-0 py-2 flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full border-2 border-brand-red flex items-center justify-center bg-brand-red/10 p-0.5">
+                  <div className="w-full h-full rounded-full bg-brand-red/20 flex items-center justify-center">
+                    <User size={16} className="text-brand-red" />
+                  </div>
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="text-sm font-bold truncate">Super Admin</span>
                   <span className="text-[10px] opacity-40 truncate">admin@shkodrapolitike.tv</span>
                 </div>
              </div>
-             <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-3 rounded-lg text-xs font-bold text-red-400 hover:bg-red-400/10 transition-all">
-               <LogOut size={18} /> Dil nga Dashboard
+             <button onClick={handleLogout} className="flex items-center gap-3 px-0 py-3 rounded-lg text-sm font-bold text-white/60 hover:text-white transition-all">
+               <LogOut size={18} className="text-brand-red" /> Dil nga Dashboard
              </button>
            </nav>
         </div>
@@ -261,7 +292,12 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             )}
           </>
         ) : (
-          <TVDashboard />
+          <TVDashboard 
+            inheritedStatus={status} 
+            inheritedVideos={videos} 
+            inheritedAds={ads}
+            inheritedLowerThirds={lowerThirds}
+          />
         )}
       </div>
     </div>

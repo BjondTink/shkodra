@@ -36,6 +36,7 @@ export default function LiveOutput() {
   const [activeAds, setActiveAds] = useState<TVAd[]>([]);
   const [activeLT, setActiveLT] = useState<TVLowerThird[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [needsInteraction, setNeedsInteraction] = useState(true);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Sync videos
@@ -76,26 +77,35 @@ export default function LiveOutput() {
   }, []);
 
   const handleVideoEnd = async () => {
-    if (!status?.isPlaylistActive || videos.length === 0) return;
-    
-    const currentIndex = videos.findIndex(v => v.id === status.currentVideoId);
-    const nextIndex = (currentIndex + 1) % videos.length;
-    const nextVideo = videos[nextIndex];
+    // If playlist is active, try to go to next video
+    if (status?.isPlaylistActive && videos.length > 0) {
+      const currentIndex = videos.findIndex(v => v.id === status.currentVideoId);
+      const nextIndex = (currentIndex + 1) % videos.length;
+      const nextVideo = videos[nextIndex];
 
-    if (nextVideo) {
-      await updateDoc(doc(db, 'status', 'current'), {
-        activeVideoUrl: nextVideo.url || '',
-        videoSource: nextVideo.type,
-        embedCode: nextVideo.embedCode || '',
-        currentVideoId: nextVideo.id,
-        lastUpdated: serverTimestamp()
-      });
+      if (nextVideo) {
+        await updateDoc(doc(db, 'status', 'current'), {
+          activeVideoUrl: nextVideo.url || '',
+          videoSource: nextVideo.type,
+          embedCode: nextVideo.embedCode || '',
+          currentVideoId: nextVideo.id,
+          lastUpdated: serverTimestamp()
+        });
+        return;
+      }
     }
+
+    // Default: Switch back to news mode when video ends
+    await updateDoc(doc(db, 'status', 'current'), {
+      mode: 'news',
+      isPlaying: true, // Start news cycle automatically
+      lastUpdated: serverTimestamp()
+    });
   };
   useEffect(() => {
     const isPlaying = status ? status.isPlaying : true;
 
-    if (newsItems.length === 0 || !isPlaying || status?.mode === 'video') {
+    if (newsItems.length === 0 || !isPlaying) {
       if (timerRef.current) clearTimeout(timerRef.current);
       return;
     }
@@ -168,8 +178,8 @@ export default function LiveOutput() {
   }, [newsItems]);
 
   const activeItem = newsItems[currentIndex];
-  const [tickerData, setTickerData] = useState<{ weather: React.ReactNode; rates: string[] }>({
-    weather: "Moti Shkodër: --",
+  const [tickerData, setTickerData] = useState<{ weatherItems: React.ReactNode[]; rates: string[] }>({
+    weatherItems: [],
     rates: ["EUR/LEK: --", "USD/LEK: --", "CHF/LEK: --", "GBP/LEK: --"]
   });
 
@@ -188,29 +198,49 @@ export default function LiveOutput() {
     80: CloudRain, 81: CloudRain, 82: CloudRain, 95: CloudLightning,
   };
 
+  const cities = [
+    { name: "Tiranë", lat: 41.3275, lon: 19.8187 },
+    { name: "Shkodër", lat: 42.0683, lon: 19.5011 },
+    { name: "Durrës", lat: 41.3236, lon: 19.4559 },
+    { name: "Vlorë", lat: 40.4661, lon: 19.4897 },
+    { name: "Elbasan", lat: 41.1125, lon: 20.0822 },
+    { name: "Korçë", lat: 40.6159, lon: 20.7778 },
+    { name: "Fier", lat: 40.7239, lon: 19.5561 },
+    { name: "Gjirokastër", lat: 40.0758, lon: 20.1389 },
+    { name: "Sarandë", lat: 39.8755, lon: 20.0056 },
+    { name: "Lezhë", lat: 41.7836, lon: 19.6425 },
+    { name: "Berat", lat: 40.7058, lon: 19.9522 },
+    { name: "Kukës", lat: 42.0767, lon: 20.42 }
+  ];
+
   // Fetch Ticker Info
   useEffect(() => {
     const fetchTickerInfo = async () => {
       try {
-        // 1. Fetch Weather (Open-Meteo for Shkodra)
-        const weatherRes = await fetch(
-          "https://api.open-meteo.com/v1/forecast?latitude=42.0683&longitude=19.5011&current=temperature_2m,weather_code"
-        );
-        const weatherJson = await weatherRes.json();
-        const temp = Math.round(weatherJson.current.temperature_2m);
-        const code = weatherJson.current.weather_code;
-        const condition = weatherMap[code] || "I pastër";
-        const WeatherIcon = weatherIconMap[code] || Cloud;
-
-        const weatherNode = (
-          <div className="flex items-center gap-3">
-            <WeatherIcon size={32} className="text-brand-red" strokeWidth={3} />
-            <span>Moti Shkodër: {temp}°C {condition}</span>
-          </div>
+        // 1. Fetch Weather for all cities
+        const weatherPromises = cities.map(city => 
+          fetch(`https://api.open-meteo.com/v1/forecast?latitude=${city.lat}&longitude=${city.lon}&current=temperature_2m,weather_code`)
+          .then(res => res.json())
+          .then(json => ({
+            name: city.name,
+            temp: Math.round(json.current.temperature_2m),
+            code: json.current.weather_code
+          }))
         );
 
-        // 2. Fetch Exchange Rates (Relative to LEK)
-        // Using open.er-api.com for free latest rates
+        const weatherResults = await Promise.all(weatherPromises);
+        const weatherNodes = weatherResults.map(res => {
+          const condition = weatherMap[res.code] || "I pastër";
+          const WeatherIcon = weatherIconMap[res.code] || Cloud;
+          return (
+            <div key={res.name} className="flex items-center gap-3">
+              <WeatherIcon size={32} className="text-brand-red" strokeWidth={3} />
+              <span>Moti {res.name}: {res.temp}°C {condition}</span>
+            </div>
+          );
+        });
+
+        // 2. Fetch Exchange Rates
         const rateRes = await fetch("https://open.er-api.com/v6/latest/ALL");
         const rateJson = await rateRes.json();
         
@@ -223,7 +253,7 @@ export default function LiveOutput() {
           };
 
           setTickerData({
-            weather: weatherNode,
+            weatherItems: weatherNodes,
             rates: [
               `EUR/LEK: ${getPriceInLek('EUR')}`,
               `USD/LEK: ${getPriceInLek('USD')}`,
@@ -233,7 +263,7 @@ export default function LiveOutput() {
             ]
           });
         } else {
-          setTickerData(prev => ({ ...prev, weather: weatherNode }));
+          setTickerData(prev => ({ ...prev, weatherItems: weatherNodes }));
         }
       } catch (error) {
         console.error('Ticker fetch error:', error);
@@ -265,8 +295,35 @@ export default function LiveOutput() {
   const dynamicStyles = activeItem ? getDynamicStyles(activeItem.headline) : { hSize: "text-6xl" };
 
   return (
-    <div className="relative w-screen h-screen bg-[#020202] overflow-hidden flex items-center justify-center p-8 aspect-video select-none">
+    <div 
+      className="relative w-screen h-screen bg-[#020202] overflow-hidden flex items-center justify-center p-8 aspect-video select-none"
+      onClick={() => {
+        if (needsInteraction) setNeedsInteraction(false);
+      }}
+    >
       <BroadcastBackground />
+
+      {/* interaction overlay */}
+      <AnimatePresence>
+        {needsInteraction && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-[100] bg-black/80 backdrop-blur-xl flex flex-col items-center justify-center cursor-pointer"
+          >
+            <div className="flex flex-col items-center gap-6">
+              <div className="w-24 h-24 rounded-full border-4 border-brand-red flex items-center justify-center animate-pulse">
+                <Radio size={48} className="text-brand-red" />
+              </div>
+              <div className="flex flex-col items-center gap-2">
+                <h2 className="text-4xl font-black uppercase tracking-tighter">KLIKO PËR TË NISUR</h2>
+                <p className="text-white/40 font-bold uppercase tracking-widest text-sm">AKTIVIZO AUDIO & VIDEO TRANSMETIMIN</p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Main Broadcast Container (16:9) */}
       <div className="relative z-10 w-full h-full flex flex-col gap-6">
@@ -281,8 +338,18 @@ export default function LiveOutput() {
               </div>
             </div>
             <div className="h-10 w-px bg-white/20" />
-            <h1 className="text-4xl font-black tracking-tighter uppercase italic drop-shadow-lg">
-              Shkodra <span className="text-brand-red">Politike</span>
+            <h1 className="text-4xl font-black tracking-tighter uppercase italic drop-shadow-lg flex gap-3">
+              {status?.stationName ? (
+                <>
+                  {status.stationName.split(' ')[0]}
+                  {status.stationName.split(' ')[1] && (
+                    <span className="text-brand-red">{status.stationName.split(' ')[1]}</span>
+                  )}
+                  {status.stationName.split(' ').slice(2).join(' ')}
+                </>
+              ) : (
+                <>Shkodra <span className="text-brand-red">Politike</span></>
+              )}
             </h1>
           </div>
           
@@ -305,7 +372,7 @@ export default function LiveOutput() {
                   exit={{ opacity: 0 }}
                   className="w-full h-full bg-black flex items-center justify-center relative overflow-hidden"
                 >
-                  <VideoPlayer status={status} onEnded={handleVideoEnd} />
+                  <VideoPlayer status={status} onEnded={handleVideoEnd} muted={needsInteraction} />
                   
                   {/* Watermark/Overlay for Video Mode */}
                   <div className="absolute top-4 left-4 bg-brand-red/90 text-white text-[10px] font-black px-3 py-1 rounded-md uppercase tracking-widest shadow-lg z-10 pointer-events-none">
@@ -457,7 +524,7 @@ export default function LiveOutput() {
              <span className="skew-x-[15deg]">Info Shërbime</span>
            </div>
            <NewsTicker items={[
-             tickerData.weather,
+             ...tickerData.weatherItems,
              ...tickerData.rates,
              "Info Shërbime LIVE"
            ]} />
@@ -467,7 +534,7 @@ export default function LiveOutput() {
                  <Facebook size={24} fill="white" />
                  <span className="text-[12px] font-black tracking-widest uppercase opacity-80">Na ndiqni</span>
                </div>
-               <span className="text-2xl font-black tracking-tighter uppercase">/shkodrapolitike</span>
+               <span className="text-2xl font-black tracking-tighter uppercase">{status?.socialHandle || "/shkodrapolitike"}</span>
              </div>
            </div>
         </div>

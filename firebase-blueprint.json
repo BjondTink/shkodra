@@ -27,11 +27,18 @@
         "lastUpdated": { "type": "string", "format": "date-time" },
         "mode": { "type": "string", "enum": ["news", "video"] },
         "activeVideoUrl": { "type": "string" },
-        "videoSource": { "type": "string", "enum": ["youtube", "facebook", "direct", "embed"] },
+        "videoSource": { "type": "string", "enum": ["youtube", "facebook", "direct", "embed", "hls"] },
         "embedCode": { "type": "string" },
         "isPlaylistActive": { "type": "boolean" },
         "currentVideoId": { "type": "string" },
-        "volume": { "type": "number" }
+        "volume": { "type": "number" },
+        "isPlaying": { "type": "boolean" },
+        "isMuted": { "type": "boolean" },
+        "loop": { "type": "boolean" },
+        "isShuffle": { "type": "boolean" },
+        "transportAction": { "type": "string", "enum": ["play", "pause", "stop", "restart", "next", "prev"] },
+        "stationName": { "type": "string" },
+        "socialHandle": { "type": "string" }
       }
     },
     "tvVideo": {
@@ -41,7 +48,7 @@
       "properties": {
         "title": { "type": "string" },
         "url": { "type": "string" },
-        "type": { "type": "string", "enum": ["youtube", "facebook", "direct", "embed"] },
+        "type": { "type": "string", "enum": ["youtube", "facebook", "direct", "embed", "hls"] },
         "embedCode": { "type": "string" },
         "order": { "type": "number" }
       }

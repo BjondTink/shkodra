@@ -43,8 +43,9 @@ export default function ClockWidget() {
   useEffect(() => {
     const fetchWeather = async () => {
       try {
+        // Tiranë coordinates
         const res = await fetch(
-          "https://api.open-meteo.com/v1/forecast?latitude=42.0683&longitude=19.5011&current=temperature_2m,weather_code"
+          "https://api.open-meteo.com/v1/forecast?latitude=41.3275&longitude=19.8187&current=temperature_2m,weather_code"
         );
         const json = await res.json();
         const temp = Math.round(json.current.temperature_2m);
@@ -78,27 +79,34 @@ export default function ClockWidget() {
   const albanianDate = `${day} ${monthsAl[monthIdx]} ${year}`.toUpperCase();
 
   return (
-    <div className="flex items-center gap-10">
-      <div className="text-right">
-        <div className="text-4xl font-mono leading-none tracking-tight tabular-nums font-black">
-          {format(now, 'HH:mm')}<span className="text-brand-red animate-pulse">:</span>{format(now, 'ss')}
+    <div className="flex items-center gap-10 drop-shadow-2xl">
+      <div className="text-right flex flex-col gap-0 border-b-2 border-brand-red pb-1">
+        <div className="text-6xl font-black tabular-nums tracking-tighter leading-none flex items-center justify-end">
+          {format(now, 'HH:mm')}
+          <span className="text-brand-red animate-pulse mx-1">:</span>
+          <span className="text-4xl opacity-50">{format(now, 'ss')}</span>
         </div>
-        <div className="text-sm uppercase tracking-widest text-white/60 font-black mt-1">
+        <div className="text-2xl uppercase tracking-[0.2em] text-white font-black mt-1">
           {albanianDate}
         </div>
       </div>
       
-      <div className="flex items-center gap-4 bg-white/10 px-6 py-4 rounded-2xl border border-white/20 shadow-2xl backdrop-blur-xl">
-        <div className="flex flex-col items-start gap-0.5">
-          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Shkodër</span>
-          <span className="text-3xl font-black tabular-nums">{weather.temp}°C</span>
+      <div className="flex items-center gap-6 bg-black/40 px-8 py-5 rounded-[2rem] border border-white/5 backdrop-blur-3xl shadow-2xl relative overflow-hidden group">
+        <div className="absolute top-0 right-0 w-24 h-24 bg-brand-red/10 blur-[40px] pointer-events-none" />
+        
+        <div className="flex flex-col items-start gap-1 relative z-10">
+          <span className="text-[9px] font-black uppercase tracking-[0.4em] text-white/20">Tiranë</span>
+          <div className="flex items-baseline gap-1">
+            <span className="text-4xl font-black tabular-nums">{weather.temp}</span>
+            <span className="text-xl font-black text-brand-red">°C</span>
+          </div>
         </div>
         
-        <div className="h-10 w-px bg-white/10" />
+        <div className="h-10 w-px bg-white/10 relative z-10" />
         
-        <div className="flex flex-col items-center gap-1">
-          <WeatherIcon size={28} className="text-brand-red drop-shadow-[0_0_8px_rgba(220,38,38,0.4)]" strokeWidth={3} />
-          <span className="text-[8px] font-black uppercase text-white/60 tracking-widest">
+        <div className="flex flex-col items-center gap-2 relative z-10">
+          <WeatherIcon size={32} className="text-brand-red drop-shadow-[0_0_15px_rgba(204,0,0,0.4)]" strokeWidth={2.5} />
+          <span className="text-[9px] font-black uppercase text-white/40 tracking-[0.2em]">
             {weather.condition}
           </span>
         </div>
