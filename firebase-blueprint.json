@@ -50,7 +50,9 @@
         "url": { "type": "string" },
         "type": { "type": "string", "enum": ["youtube", "facebook", "direct", "embed", "hls"] },
         "embedCode": { "type": "string" },
-        "order": { "type": "number" }
+        "order": { "type": "number" },
+        "ltTitle": { "type": "string" },
+        "ltSubtitle": { "type": "string" }
       }
     },
     "tvAd": {
@@ -60,7 +62,8 @@
       "properties": {
         "imageUrl": { "type": "string" },
         "title": { "type": "string" },
-        "active": { "type": "boolean" }
+        "active": { "type": "boolean" },
+        "externalUrl": { "type": "string" }
       }
     },
     "tvLowerThird": {

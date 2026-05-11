@@ -43,6 +43,8 @@ export interface TVVideo {
   type: 'youtube' | 'facebook' | 'direct' | 'embed' | 'hls';
   embedCode?: string;
   order: number;
+  ltTitle?: string;
+  ltSubtitle?: string;
 }
 
 export interface TVAd {
@@ -50,6 +52,7 @@ export interface TVAd {
   imageUrl: string;
   title: string;
   active: boolean;
+  externalUrl?: string;
 }
 
 export interface TVLowerThird {

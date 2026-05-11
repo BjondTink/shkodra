@@ -39,6 +39,9 @@ export default function LiveOutput() {
   const [needsInteraction, setNeedsInteraction] = useState(true);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
+  const [activeAdId, setActiveAdId] = useState<string | null>(null);
+  const [autoLT, setAutoLT] = useState<{ title: string; subtitle: string } | null>(null);
+
   // Sync videos
   useEffect(() => {
     const q = query(collection(db, 'tvVideos'), orderBy('order', 'asc'));
@@ -64,6 +67,23 @@ export default function LiveOutput() {
       }
     });
   }, []);
+
+  // Automatic Lower Third for Playlist Videos
+  useEffect(() => {
+    setAutoLT(null);
+    if (status?.mode === 'video' && status.currentVideoId) {
+      const currentVideo = videos.find(v => v.id === status.currentVideoId);
+      if (currentVideo && (currentVideo.ltTitle || currentVideo.ltSubtitle)) {
+        const timer = setTimeout(() => {
+          setAutoLT({
+            title: currentVideo.ltTitle || '',
+            subtitle: currentVideo.ltSubtitle || ''
+          });
+        }, 10000); // 10 seconds delay
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [status?.mode, status?.currentVideoId, videos]);
 
   // Sync TV Overlays
   useEffect(() => {
@@ -102,48 +122,33 @@ export default function LiveOutput() {
       lastUpdated: serverTimestamp()
     });
   };
+  // News Rotation Logic
   useEffect(() => {
-    const isPlaying = status ? status.isPlaying : true;
-
-    if (newsItems.length === 0 || !isPlaying) {
+    // Basic safety check: must have news items to cycle
+    if (newsItems.length === 0) {
       if (timerRef.current) clearTimeout(timerRef.current);
       return;
     }
 
-    // BREAKING NEWS FILTERING (Expiration handled by dedicated useEffect)
-    const breakingItems = newsItems.filter(item => item.isBreakingNews);
-    const itemsToCycle = breakingItems.length > 0 ? breakingItems : newsItems;
-    
-    // Find correctly mapped index in the target cycle
-    const currentItemOriginal = newsItems[currentIndex];
-    let activeInCycleIndex = itemsToCycle.findIndex(i => i.id === currentItemOriginal?.id);
-    
-    // If current item is not in the cycle (e.g. we just switched to breaking-priority)
-    if (activeInCycleIndex === -1) {
-      activeInCycleIndex = 0;
-      const targetIndex = newsItems.findIndex(i => i.id === itemsToCycle[0].id);
-      if (targetIndex !== -1) {
-        setCurrentIndex(targetIndex);
-      }
-      return;
-    }
+    // Safety check for index
+    const safeIndex = currentIndex >= newsItems.length ? 0 : currentIndex;
+    const currentItem = newsItems[safeIndex];
+    if (!currentItem) return;
 
-    const currentItem = itemsToCycle[activeInCycleIndex];
-    // Breaking News stays 20s, Normal stay user-defined duration
-    const duration = (currentItem?.isBreakingNews ? 20 : (currentItem?.duration || 10)) * 1000;
+    // Use current item's duration or default to 10s
+    const duration = (currentItem.isBreakingNews ? 20 : (currentItem.duration || 10)) * 1000;
 
     timerRef.current = setTimeout(() => {
-      const nextInCycle = (activeInCycleIndex + 1) % itemsToCycle.length;
-      const nextOriginalIndex = newsItems.findIndex(i => i.id === itemsToCycle[nextInCycle].id);
-      if (nextOriginalIndex !== -1) {
-        setCurrentIndex(nextOriginalIndex);
-      }
+      setCurrentIndex((prev) => {
+        if (newsItems.length === 0) return 0;
+        return (prev + 1) % newsItems.length;
+      });
     }, duration);
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [currentIndex, newsItems, status]);
+  }, [currentIndex, newsItems.length]);
 
   // Dedicated Auto-Expiration Checker
   useEffect(() => {
@@ -412,6 +417,26 @@ export default function LiveOutput() {
             {/* Lower Thirds inside Media Container */}
             <div className="absolute bottom-10 left-10 pointer-events-none z-20 w-full pr-20">
                <AnimatePresence>
+                 {autoLT && (
+                   <motion.div
+                     key="auto-lt"
+                     initial={{ opacity: 0, x: -100 }}
+                     animate={{ opacity: 1, x: 0 }}
+                     exit={{ opacity: 0, x: -100 }}
+                     className="flex flex-col gap-0 mb-4"
+                   >
+                     <div className="bg-brand-red px-10 py-3 shadow-2xl inline-block skew-x-[-15deg] -translate-x-4 border-l-8 border-white">
+                        <span className="skew-x-[15deg] block text-4xl font-black text-white uppercase tracking-tighter">
+                          {autoLT.title}
+                        </span>
+                     </div>
+                     <div className="bg-black/90 px-8 py-2 shadow-xl inline-block skew-x-[-15deg] border-l-4 border-brand-red">
+                        <span className="skew-x-[15deg] block text-lg font-bold text-white/80 uppercase tracking-widest">
+                          {autoLT.subtitle}
+                        </span>
+                     </div>
+                   </motion.div>
+                 )}
                  {activeLT.map(lt => (
                    <motion.div
                      key={lt.id}
@@ -523,11 +548,11 @@ export default function LiveOutput() {
            <div className="bg-brand-red px-14 h-full flex items-center font-black italic text-3xl tracking-tighter uppercase whitespace-nowrap border-r-8 border-black/10 text-white skew-x-[-15deg] -translate-x-6">
              <span className="skew-x-[15deg]">Info Shërbime</span>
            </div>
-           <NewsTicker items={[
-             ...tickerData.weatherItems,
-             ...tickerData.rates,
-             "Info Shërbime LIVE"
-           ]} />
+            <NewsTicker items={[
+              ...tickerData.weatherItems,
+              ...tickerData.rates,
+              "Info Shërbime LIVE"
+            ]} />
            <div className="h-full px-12 flex items-center bg-[#1877F2] text-white shrink-0 skew-x-[-15deg] translate-x-6 border-l-8 border-white/20">
              <div className="skew-x-[15deg] flex flex-col items-start gap-0">
                <div className="flex items-center gap-2">

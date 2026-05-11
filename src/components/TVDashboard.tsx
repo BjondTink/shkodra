@@ -40,9 +40,12 @@ export default function TVDashboard({
   const [status, setStatus] = useState<AppStatus | null>(inheritedStatus || null);
   
   const [addMethod, setAddMethod] = useState<'url' | 'embed'>('url');
-  const [newVideo, setNewVideo] = useState({ title: '', url: '', type: 'youtube', embedCode: '' });
-  const [newAd, setNewAd] = useState({ title: '', imageUrl: '' });
+  const [newVideo, setNewVideo] = useState({ title: '', url: '', type: 'youtube', embedCode: '', ltTitle: '', ltSubtitle: '' });
+  const [newAd, setNewAd] = useState({ title: '', imageUrl: '', externalUrl: '' });
   const [newLT, setNewLT] = useState({ title: '', subtitle: '' });
+  
+  const [editingVideoId, setEditingVideoId] = useState<string | null>(null);
+  const [editingAdId, setEditingAdId] = useState<string | null>(null);
 
   useEffect(() => {
     if (inheritedStatus) setStatus(inheritedStatus);
@@ -98,19 +101,32 @@ export default function TVDashboard({
     else if (addMethod === 'embed') type = 'embed';
     else type = 'direct';
 
-    await addDoc(collection(db, 'tvVideos'), {
-      ...newVideo,
-      type,
-      order: videos.length
-    });
-    setNewVideo({ title: '', url: '', type: 'youtube', embedCode: '' });
+    if (editingVideoId) {
+      await updateDoc(doc(db, 'tvVideos', editingVideoId), {
+        ...newVideo,
+        type
+      });
+      setEditingVideoId(null);
+    } else {
+      await addDoc(collection(db, 'tvVideos'), {
+        ...newVideo,
+        type,
+        order: videos.length
+      });
+    }
+    setNewVideo({ title: '', url: '', type: 'youtube', embedCode: '', ltTitle: '', ltSubtitle: '' });
   };
 
   const handleAddAd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newAd.title || !newAd.imageUrl) return;
-    await addDoc(collection(db, 'tvAds'), { ...newAd, active: false });
-    setNewAd({ title: '', imageUrl: '' });
+    if (editingAdId) {
+      await updateDoc(doc(db, 'tvAds', editingAdId), { ...newAd });
+      setEditingAdId(null);
+    } else {
+      await addDoc(collection(db, 'tvAds'), { ...newAd, active: false });
+    }
+    setNewAd({ title: '', imageUrl: '', externalUrl: '' });
   };
 
   const handleAddLT = async (e: React.FormEvent) => {
@@ -277,9 +293,46 @@ export default function TVDashboard({
                   )}
                 </div>
 
-                <button type="submit" className="bg-white text-black hover:bg-brand-red hover:text-white font-black py-5 rounded-2xl text-[11px] uppercase tracking-[0.3em] transition-all shadow-2xl active:scale-95">
-                  SHTO NË PLAYLIST
-                </button>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-2">
+                    <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.4em] ml-2">Lower Third Titulli</span>
+                    <input 
+                      type="text" 
+                      placeholder="Emri personit..." 
+                      className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs focus:outline-none focus:border-brand-red/40 transition-all font-bold placeholder:text-white/10"
+                      value={newVideo.ltTitle}
+                      onChange={e => setNewVideo({...newVideo, ltTitle: e.target.value})}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.4em] ml-2">Lower Third Nëntitulli</span>
+                    <input 
+                      type="text" 
+                      placeholder="Pozicioni..." 
+                      className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs focus:outline-none focus:border-brand-red/40 transition-all font-bold placeholder:text-white/10"
+                      value={newVideo.ltSubtitle}
+                      onChange={e => setNewVideo({...newVideo, ltSubtitle: e.target.value})}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-4">
+                  {editingVideoId && (
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        setEditingVideoId(null);
+                        setNewVideo({ title: '', url: '', type: 'youtube', embedCode: '', ltTitle: '', ltSubtitle: '' });
+                      }}
+                      className="flex-1 bg-white/5 text-white/40 font-black py-5 rounded-2xl text-[11px] uppercase tracking-[0.3em] transition-all border border-white/5"
+                    >
+                      ANULO
+                    </button>
+                  )}
+                  <button type="submit" className="flex-[2] bg-white text-black hover:bg-brand-red hover:text-white font-black py-5 rounded-2xl text-[11px] uppercase tracking-[0.3em] transition-all shadow-2xl active:scale-95">
+                    {editingVideoId ? 'PËRDITËSO' : 'SHTO NË PLAYLIST'}
+                  </button>
+                </div>
               </form>
             </div>
 
@@ -323,7 +376,25 @@ export default function TVDashboard({
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-2 relative z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-2 relative z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button 
+                      onClick={(e) => { 
+                        e.stopPropagation(); 
+                        setEditingVideoId(video.id);
+                        setNewVideo({
+                          title: video.title,
+                          url: video.url,
+                          type: video.type,
+                          embedCode: video.embedCode || '',
+                          ltTitle: video.ltTitle || '',
+                          ltSubtitle: video.ltSubtitle || ''
+                        });
+                        setAddMethod(video.type === 'embed' ? 'embed' : 'url');
+                      }}
+                      className="p-3 text-white/20 hover:text-white hover:bg-white/10 rounded-xl transition-all"
+                    >
+                      <Type size={18} />
+                    </button>
                     <button 
                       onClick={(e) => { e.stopPropagation(); deleteDoc(doc(db, 'tvVideos', video.id)); }}
                       className="p-3 text-white/20 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
@@ -423,6 +494,12 @@ export default function TVDashboard({
                        <div className="flex items-center justify-between">
                          <h4 className="text-sm font-black text-white uppercase tracking-tighter opacity-80">{ad.title}</h4>
                          <div className="flex items-center gap-4">
+                           <button onClick={() => {
+                             setEditingAdId(ad.id);
+                             setNewAd({ title: ad.title, imageUrl: ad.imageUrl, externalUrl: ad.externalUrl || '' });
+                           }} className="p-2 bg-black/60 rounded-full border border-white/10 text-white">
+                              <Type size={18} />
+                           </button>
                            <button onClick={() => updateDoc(doc(db, 'tvAds', ad.id), { active: !ad.active })} className="p-2 bg-black/60 rounded-full border border-white/10 text-white">
                               {ad.active ? <Eye size={18} /> : <EyeOff size={18} className="opacity-40" />}
                            </button>
@@ -457,10 +534,35 @@ export default function TVDashboard({
                       onChange={e => setNewAd({...newAd, imageUrl: e.target.value})}
                     />
                   </div>
+
+                  <div className="flex flex-col gap-2">
+                     <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.4em] ml-1">External Link (Optional)</span>
+                     <input 
+                      type="text" 
+                      placeholder="https://..." 
+                      className="bg-transparent border-b border-white/10 px-1 py-3 text-sm focus:outline-none focus:border-brand-red transition-all font-bold"
+                      value={newAd.externalUrl}
+                      onChange={e => setNewAd({...newAd, externalUrl: e.target.value})}
+                    />
+                  </div>
                   
-                  <button type="submit" className="bg-white text-black hover:bg-brand-red hover:text-white font-black py-4 rounded-xl text-[11px] uppercase tracking-[0.3em] transition-all shadow-2xl active:scale-95">
-                    SHTO AD
-                  </button>
+                  <div className="flex gap-4">
+                    {editingAdId && (
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          setEditingAdId(null);
+                          setNewAd({ title: '', imageUrl: '', externalUrl: '' });
+                        }}
+                        className="flex-1 bg-white/5 text-white/40 font-black py-4 rounded-xl text-[11px] uppercase tracking-[0.3em] transition-all border border-white/5"
+                      >
+                        ANULO
+                      </button>
+                    )}
+                    <button type="submit" className="flex-[2] bg-white text-black hover:bg-brand-red hover:text-white font-black py-4 rounded-xl text-[11px] uppercase tracking-[0.3em] transition-all shadow-2xl active:scale-95">
+                      {editingAdId ? 'PËRDITËSO' : 'SHTO AD'}
+                    </button>
+                  </div>
                 </form>
               </div>
             </section>

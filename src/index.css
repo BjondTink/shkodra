@@ -37,7 +37,7 @@
   display: flex;
   white-space: nowrap;
   gap: 4rem;
-  animation: ticker-scroll 60s linear infinite;
+  animation: ticker-scroll 120s linear infinite;
 }
 
 @keyframes ticker-scroll {
