@@ -41,6 +41,30 @@ export default function LiveOutput() {
 
   const [activeAdId, setActiveAdId] = useState<string | null>(null);
   const [autoLT, setAutoLT] = useState<{ title: string; subtitle: string } | null>(null);
+  const [rssNews, setRssNews] = useState<NewsItem[]>([]);
+  const [rssLoading, setRssLoading] = useState(false);
+
+  // Fetch live Albanian RSS news
+  const fetchRss = async (force = false) => {
+    try {
+      setRssLoading(true);
+      const res = await fetch(`/api/rss-news${force ? '?refresh=true' : ''}`);
+      const data = await res.json();
+      if (data.success && Array.isArray(data.items)) {
+        setRssNews(data.items);
+      }
+    } catch (e) {
+      console.error('Failed to load RSS news:', e);
+    } finally {
+      setRssLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRss();
+    const interval = setInterval(() => fetchRss(), 150000); // 2.5 minutes
+    return () => clearInterval(interval);
+  }, []);
 
   // Sync videos
   useEffect(() => {
@@ -122,33 +146,59 @@ export default function LiveOutput() {
       lastUpdated: serverTimestamp()
     });
   };
+  // Combine manual news items with automatic nonstop RSS news items
+  const displayNews = React.useMemo(() => {
+    // If RSS is explicitly turned off
+    if (status?.rssEnabled === false || status?.rssMode === 'manual_only') {
+      return newsItems;
+    }
+    // If RSS-only mode
+    if (status?.rssMode === 'rss_only') {
+      return rssNews.length > 0 ? rssNews : newsItems;
+    }
+    // Mixed mode: manual news items first, followed by nonstop RSS news
+    if (newsItems.length > 0 && rssNews.length > 0) {
+      return [...newsItems, ...rssNews];
+    }
+    if (rssNews.length > 0) return rssNews;
+    return newsItems;
+  }, [newsItems, rssNews, status?.rssEnabled, status?.rssMode]);
+
+  const safeIndex = displayNews.length > 0 ? currentIndex % displayNews.length : 0;
+  const activeItem = displayNews[safeIndex] || null;
+  const nextItem = displayNews.length > 1 ? displayNews[(safeIndex + 1) % displayNews.length] : null;
+
   // News Rotation Logic
   useEffect(() => {
     // Basic safety check: must have news items to cycle
-    if (newsItems.length === 0) {
+    if (displayNews.length === 0) {
       if (timerRef.current) clearTimeout(timerRef.current);
       return;
     }
 
-    // Safety check for index
-    const safeIndex = currentIndex >= newsItems.length ? 0 : currentIndex;
-    const currentItem = newsItems[safeIndex];
+    // Respect pause state if status is loaded
+    if (status && status.isPlaying === false) {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      return;
+    }
+
+    const currentItem = displayNews[safeIndex];
     if (!currentItem) return;
 
-    // Use current item's duration or default to 10s
-    const duration = (currentItem.isBreakingNews ? 20 : (currentItem.duration || 10)) * 1000;
+    // Use current item's duration or default to 12s (18s for breaking news)
+    const duration = (currentItem.isBreakingNews ? 18 : (currentItem.duration || 12)) * 1000;
 
     timerRef.current = setTimeout(() => {
       setCurrentIndex((prev) => {
-        if (newsItems.length === 0) return 0;
-        return (prev + 1) % newsItems.length;
+        if (displayNews.length === 0) return 0;
+        return (prev + 1) % displayNews.length;
       });
     }, duration);
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [currentIndex, newsItems.length]);
+  }, [currentIndex, displayNews.length, safeIndex, status?.isPlaying]);
 
   // Dedicated Auto-Expiration Checker
   useEffect(() => {
@@ -181,13 +231,6 @@ export default function LiveOutput() {
     const interval = setInterval(checkExpiration, 30000); // Check every 30 seconds
     return () => clearInterval(interval);
   }, [newsItems]);
-
-  const activeItem = newsItems[currentIndex];
-  const [tickerData, setTickerData] = useState<{ weatherItems: React.ReactNode[]; rates: string[] }>({
-    weatherItems: [],
-    rates: ["EUR/LEK: --", "USD/LEK: --", "CHF/LEK: --", "GBP/LEK: --"]
-  });
-
   // Weather code mapping (WMO codes to Albanian)
   const weatherMap: Record<number, string> = {
     0: "Kthjellët", 1: "Kthjellët", 2: "Me re", 3: "Vrenjtur",
@@ -203,101 +246,98 @@ export default function LiveOutput() {
     80: CloudRain, 81: CloudRain, 82: CloudRain, 95: CloudLightning,
   };
 
-  const cities = [
-    { name: "Tiranë", lat: 41.3275, lon: 19.8187 },
-    { name: "Shkodër", lat: 42.0683, lon: 19.5011 },
-    { name: "Durrës", lat: 41.3236, lon: 19.4559 },
-    { name: "Vlorë", lat: 40.4661, lon: 19.4897 },
-    { name: "Elbasan", lat: 41.1125, lon: 20.0822 },
-    { name: "Korçë", lat: 40.6159, lon: 20.7778 },
-    { name: "Fier", lat: 40.7239, lon: 19.5561 },
-    { name: "Gjirokastër", lat: 40.0758, lon: 20.1389 },
-    { name: "Sarandë", lat: 39.8755, lon: 20.0056 },
-    { name: "Lezhë", lat: 41.7836, lon: 19.6425 },
-    { name: "Berat", lat: 40.7058, lon: 19.9522 },
-    { name: "Kukës", lat: 42.0767, lon: 20.42 }
+  // Initial placeholder ticker items
+  const initialCities = [
+    { name: "Tiranë", temp: 16, code: 0 },
+    { name: "Shkodër", temp: 15, code: 1 },
+    { name: "Durrës", temp: 17, code: 0 },
+    { name: "Vlorë", temp: 18, code: 0 },
+    { name: "Elbasan", temp: 16, code: 1 },
+    { name: "Korçë", temp: 12, code: 2 },
+    { name: "Fier", temp: 17, code: 0 },
+    { name: "Sarandë", temp: 19, code: 0 },
+    { name: "Berat", temp: 17, code: 0 },
+    { name: "Kukës", temp: 11, code: 2 }
   ];
 
-  // Fetch Ticker Info
+  const buildWeatherNodes = (items: Array<{ name: string; temp: number; code: number }>) => {
+    return items.map(res => {
+      const condition = weatherMap[res.code] || "I pastër";
+      const WeatherIcon = weatherIconMap[res.code] || Cloud;
+      return (
+        <div key={res.name} className="flex items-center gap-3">
+          <WeatherIcon size={32} className="text-brand-red" strokeWidth={3} />
+          <span>Moti {res.name}: {res.temp}°C {condition}</span>
+        </div>
+      );
+    });
+  };
+
+  const [tickerData, setTickerData] = useState<{ weatherItems: React.ReactNode[]; rates: string[] }>({
+    weatherItems: buildWeatherNodes(initialCities),
+    rates: [
+      "EUR/LEK: 100.25",
+      "USD/LEK: 92.40",
+      "CHF/LEK: 104.20",
+      "GBP/LEK: 118.50",
+      "Kursi Zyrtar (LEK)"
+    ]
+  });
+
+  // Fetch Ticker Info from backend service
   useEffect(() => {
+    let isMounted = true;
     const fetchTickerInfo = async () => {
       try {
-        // 1. Fetch Weather for all cities
-        const weatherPromises = cities.map(city => 
-          fetch(`https://api.open-meteo.com/v1/forecast?latitude=${city.lat}&longitude=${city.lon}&current=temperature_2m,weather_code`)
-          .then(res => res.json())
-          .then(json => ({
-            name: city.name,
-            temp: Math.round(json.current.temperature_2m),
-            code: json.current.weather_code
-          }))
-        );
-
-        const weatherResults = await Promise.all(weatherPromises);
-        const weatherNodes = weatherResults.map(res => {
-          const condition = weatherMap[res.code] || "I pastër";
-          const WeatherIcon = weatherIconMap[res.code] || Cloud;
-          return (
-            <div key={res.name} className="flex items-center gap-3">
-              <WeatherIcon size={32} className="text-brand-red" strokeWidth={3} />
-              <span>Moti {res.name}: {res.temp}°C {condition}</span>
-            </div>
-          );
-        });
-
-        // 2. Fetch Exchange Rates
-        const rateRes = await fetch("https://open.er-api.com/v6/latest/ALL");
-        const rateJson = await rateRes.json();
+        const res = await fetch("/api/ticker-data");
+        if (!res.ok) return;
+        const json = await res.json();
         
-        if (rateJson.result === "success") {
-          const rates = rateJson.rates;
-          const getPriceInLek = (code: string) => {
-            const rate = rates[code];
-            if (!rate) return "--";
-            return (1 / rate).toFixed(2);
-          };
+        if (json && isMounted) {
+          let weatherNodes = tickerData.weatherItems;
+          if (Array.isArray(json.weather) && json.weather.length > 0) {
+            weatherNodes = buildWeatherNodes(json.weather);
+          }
+
+          const rates = Array.isArray(json.rates) && json.rates.length > 0
+            ? json.rates
+            : tickerData.rates;
 
           setTickerData({
             weatherItems: weatherNodes,
-            rates: [
-              `EUR/LEK: ${getPriceInLek('EUR')}`,
-              `USD/LEK: ${getPriceInLek('USD')}`,
-              `CHF/LEK: ${getPriceInLek('CHF')}`,
-              `GBP/LEK: ${getPriceInLek('GBP')}`,
-              `Kursi Zyrtar (LEK)`
-            ]
+            rates
           });
-        } else {
-          setTickerData(prev => ({ ...prev, weatherItems: weatherNodes }));
         }
-      } catch (error) {
-        console.error('Ticker fetch error:', error);
+      } catch {
+        // Fall back seamlessly without logging error to console
       }
     };
 
     fetchTickerInfo();
-    const interval = setInterval(fetchTickerInfo, 600000); 
-    return () => clearInterval(interval);
+    const interval = setInterval(fetchTickerInfo, 300000); // 5 minutes
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
-  // Sync news items
+  // Dynamic typography for headline length
   const getDynamicStyles = (headline: string) => {
     const hLen = headline.length;
-    
-    let hSize = "text-7xl";
-    
-    if (hLen > 100) {
-      hSize = "text-5xl";
-    } else if (hLen > 60) {
-      hSize = "text-6xl";
-    } else if (hLen < 30) {
-      hSize = "text-9xl";
+    let hSize = "text-4xl xl:text-5xl";
+    if (hLen > 110) {
+      hSize = "text-2xl xl:text-3xl";
+    } else if (hLen > 75) {
+      hSize = "text-3xl xl:text-4xl";
+    } else if (hLen > 45) {
+      hSize = "text-4xl xl:text-5xl";
+    } else if (hLen < 25) {
+      hSize = "text-5xl xl:text-6xl";
     }
-    
     return { hSize };
   };
 
-  const dynamicStyles = activeItem ? getDynamicStyles(activeItem.headline) : { hSize: "text-6xl" };
+  const dynamicStyles = activeItem ? getDynamicStyles(activeItem.headline) : { hSize: "text-4xl xl:text-5xl" };
 
   return (
     <div 
@@ -392,6 +432,7 @@ export default function LiveOutput() {
                     type={activeItem.mediaType}
                     source={activeItem.source}
                     isBreakingNews={activeItem.isBreakingNews}
+                    headline={activeItem.headline}
                   />
                 )
               )}
@@ -463,82 +504,118 @@ export default function LiveOutput() {
 
           {/* Vertical News Area - 38% per Editorial Design */}
           <div className="w-[38%] flex flex-col h-full">
-             <div className="flex-1 glass-morphism rounded-2xl p-10 relative overflow-hidden">
-                <div className="flex items-center justify-between mb-8">
-                  <span className="text-xs font-black uppercase tracking-[0.3em] text-brand-red">Lajmet Kryesore</span>
-                  <div className="flex gap-1.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-white/40"></div>
-                    <div className="w-1.5 h-1.5 rounded-full bg-brand-red animate-pulse"></div>
-                    <div className="w-1.5 h-1.5 rounded-full bg-white/40"></div>
+             <div className="flex-1 glass-morphism rounded-2xl p-8 relative overflow-hidden flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-black uppercase tracking-[0.3em] text-brand-red flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-brand-red animate-ping" />
+                        Lajmet Kryesore
+                      </span>
+                      {activeItem?.isRss && (
+                        <span className="bg-red-500/15 border border-red-500/30 text-red-400 text-[10px] font-black uppercase px-2.5 py-0.5 rounded tracking-widest shadow-sm">
+                          NON-STOP LIVE
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-bold text-white/50 uppercase tracking-widest">
+                        {displayNews.length > 0 ? `${safeIndex + 1} / ${displayNews.length}` : '0/0'}
+                      </span>
+                      <div className="flex gap-1.5 ml-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-white/40"></div>
+                        <div className="w-1.5 h-1.5 rounded-full bg-brand-red animate-pulse"></div>
+                        <div className="w-1.5 h-1.5 rounded-full bg-white/40"></div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="relative">
+                     <AnimatePresence mode="wait">
+                        {activeItem && (
+                          <motion.div
+                            key={activeItem.id}
+                            initial={{ opacity: 0, x: 40 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -40 }}
+                            transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                            className="flex flex-col gap-5 py-2"
+                          >
+                             <div className="border-l-8 border-brand-red pl-6 flex flex-col gap-4">
+                               <div className="flex flex-wrap items-center gap-2.5">
+                                 <div className="bg-brand-red px-4 py-1.5 rounded-lg text-lg font-black italic text-white uppercase tracking-[0.15em] skew-x-[-15deg] shadow-[0_0_20px_rgba(220,38,38,0.4)]">
+                                   <span className="skew-x-[15deg] block">
+                                     {activeItem.publishedTime || (() => {
+                                        if (!activeItem.createdAt) return 'TANI';
+                                        const date = (activeItem.createdAt as any).toDate ? (activeItem.createdAt as any).toDate() : new Date(activeItem.createdAt);
+                                        return date.toLocaleTimeString('sq-AL', { hour: '2-digit', minute: '2-digit', hour12: false });
+                                     })()}
+                                   </span>
+                                 </div>
+                                 {activeItem.source && (
+                                   <div className="bg-white/10 backdrop-blur-md border border-white/20 px-3.5 py-1.5 rounded-lg text-sm font-black text-white uppercase tracking-wider shadow-lg flex items-center gap-1.5">
+                                     <span className="w-1.5 h-1.5 rounded-full bg-brand-red animate-pulse" />
+                                     {activeItem.source}
+                                   </div>
+                                 )}
+                                 {activeItem.isBreakingNews && (
+                                   <div className="bg-amber-500 text-black px-3 py-1 rounded-md text-xs font-black uppercase tracking-widest animate-pulse flex items-center gap-1.5">
+                                     <AlertTriangle size={14} /> E Fundit
+                                   </div>
+                                 )}
+                                 <div className="h-1 flex-1 bg-white/10 rounded-full min-w-[20px]" />
+                               </div>
+
+                               {(activeItem.headlines && activeItem.headlines.length > 0) ? (
+                                 activeItem.headlines.map((headline, idx) => (
+                                   <motion.h2 
+                                     key={idx}
+                                     initial={{ opacity: 0, y: 15 }}
+                                     animate={{ opacity: 1 - (idx * 0.25), y: 0 }}
+                                     transition={{ delay: idx * 0.15, duration: 0.6 }}
+                                     className={cn(
+                                       "font-black leading-[1.08] text-white tracking-wide uppercase transition-all duration-300 drop-shadow-md",
+                                       dynamicStyles.hSize
+                                     )}
+                                   >
+                                     {headline}
+                                   </motion.h2>
+                                 ))
+                               ) : (
+                                 <h2 className={cn(
+                                   "font-black leading-[1.08] text-white tracking-wide uppercase transition-all duration-300 drop-shadow-md",
+                                   dynamicStyles.hSize
+                                 )}>
+                                   {activeItem.headline}
+                                 </h2>
+                               )}
+
+                               {activeItem.summary && activeItem.summary.length > 25 && (
+                                 <p className="text-white/70 text-sm md:text-base font-medium leading-relaxed line-clamp-3 mt-1 pr-2 border-t border-white/10 pt-2.5">
+                                   {activeItem.summary}
+                                 </p>
+                               )}
+                             </div>
+                          </motion.div>
+                        )}
+                     </AnimatePresence>
                   </div>
                 </div>
-                
-                <div className="h-full relative">
-                   <AnimatePresence mode="wait">
-                      {activeItem && (
-                        <motion.div
-                          key={activeItem.id}
-                          initial={{ opacity: 0, x: 50 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: -50 }}
-                          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                          className="flex flex-col gap-12 py-10"
-                        >
-                           <div className="border-l-8 border-brand-red pl-10 flex flex-col gap-6">
-                             <div className="flex items-center gap-4 mb-4">
-                               <div className="bg-brand-red px-5 py-2 rounded-lg text-xl font-black italic text-white uppercase tracking-[0.2em] skew-x-[-15deg] shadow-[0_0_20px_rgba(220,38,38,0.4)]">
-                                 <span className="skew-x-[15deg] block">
-                                   {activeItem.publishedTime || (() => {
-                                      if (!activeItem.createdAt) return 'TANI';
-                                      const date = (activeItem.createdAt as any).toDate ? (activeItem.createdAt as any).toDate() : new Date(activeItem.createdAt);
-                                      return date.toLocaleTimeString('sq-AL', { hour: '2-digit', minute: '2-digit' });
-                                   })()}
-                                 </span>
-                               </div>
-                               <div className="h-1 w-24 bg-white/10 rounded-full" />
-                             </div>
-                             {(activeItem.headlines && activeItem.headlines.length > 0) ? (
-                               activeItem.headlines.map((headline, idx) => (
-                                 <motion.h2 
-                                   key={idx}
-                                   initial={{ opacity: 0, y: 20 }}
-                                   animate={{ opacity: 1 - (idx * 0.35), y: 0 }}
-                                   transition={{ delay: idx * 0.2, duration: 0.8 }}
-                                   className={cn(
-                                     "font-black leading-[1.02] text-white tracking-widest uppercase transition-all duration-500",
-                                     dynamicStyles.hSize,
-                                     idx === 0 ? "opacity-100" : 
-                                     idx === 1 ? "opacity-60" : 
-                                     idx === 2 ? "opacity-30" : "opacity-10"
-                                   )}
-                                 >
-                                   {headline}
-                                 </motion.h2>
-                               ))
-                             ) : (
-                               <h2 className={cn(
-                                 "font-black leading-[1.02] text-white tracking-widest uppercase transition-all duration-500",
-                                 dynamicStyles.hSize
-                               )}>
-                                 {activeItem.headline}
-                               </h2>
-                             )}
-                           </div>
-                           
-                           {/* Decorative Ghost Items for Depth */}
-                           <div className="space-y-8 opacity-5 pointer-events-none">
-                              {newsItems.filter(i => i.id !== activeItem.id).slice(0, 1).map(item => (
-                                <div key={`ghost-${item.id}`} className="border-l-4 border-white/20 pl-8 py-4">
-                                  <h3 className="font-black text-3xl leading-tight mb-2 uppercase tracking-wide opacity-20">{item.headline}</h3>
-                                </div>
-                              ))}
-                           </div>
-                        </motion.div>
-                      )}
-                   </AnimatePresence>
-                </div>
 
-                <div className="mt-auto" />
+                {/* Bottom of Right Panel: Next Up Story */}
+                {nextItem && (
+                  <div className="border-t border-white/10 pt-4 mt-auto">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-white/40">Tjetra në radhë:</span>
+                      {nextItem.source && (
+                        <span className="text-[10px] font-black text-brand-red uppercase">{nextItem.source}</span>
+                      )}
+                    </div>
+                    <p className="text-white/60 text-xs md:text-sm font-bold line-clamp-1 uppercase tracking-wide">
+                      {nextItem.headline}
+                    </p>
+                  </div>
+                )}
              </div>
           </div>
         </div>

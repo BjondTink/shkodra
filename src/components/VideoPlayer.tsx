@@ -16,7 +16,7 @@ export default function VideoPlayer({ status, onEnded, hideControls = false, mut
   const [hasError, setHasError] = useState(false);
   const [isMuted, setIsMuted] = useState(initialMuted);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const playerRef = useRef<ReactPlayer>(null);
+  const playerRef = useRef<any>(null);
 
   useEffect(() => {
     setIsMuted(initialMuted);
@@ -180,26 +180,29 @@ export default function VideoPlayer({ status, onEnded, hideControls = false, mut
             <AlertTriangle size={48} />
             <p className="text-sm font-bold uppercase tracking-widest">Gabim në ngarkimin e videos</p>
           </div>
-        ) : (
-          <ReactPlayer 
-            ref={playerRef}
-            url={url}
-            playing={status.isPlaying}
-            controls={!hideControls}
-            width="100%"
-            height="100%"
-            muted={isMuted}
-            playsinline={true}
-            volume={volume}
-            loop={status.loop}
-            onEnded={onEnded}
-            onError={() => setHasError(true)}
-            config={{
-              youtube: { playerVars: { modestbranding: 1, rel: 0 } },
-              facebook: { appId: '12345' }
-            }}
-          />
-        )}
+        ) : (() => {
+          const Player: any = ReactPlayer;
+          return (
+            <Player 
+              ref={playerRef}
+              url={url}
+              playing={status.isPlaying}
+              controls={!hideControls}
+              width="100%"
+              height="100%"
+              muted={isMuted}
+              playsinline={true}
+              volume={volume}
+              loop={status.loop}
+              onEnded={onEnded}
+              onError={() => setHasError(true)}
+              config={{
+                youtube: { playerVars: { modestbranding: 1, rel: 0 } },
+                facebook: { appId: '12345' }
+              } as any}
+            />
+          );
+        })()}
       </div>
     );
   };
