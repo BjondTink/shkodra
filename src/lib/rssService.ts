@@ -1,15 +1,78 @@
 import Parser from 'rss-parser';
 import type { NewsItem } from '../types.ts';
 
-interface RssSourceConfig {
+export interface RssSourceConfig {
   id: string;
   name: string;
   url: string;
   logoText: string;
   category: string;
+  categoryDefault?: string;
 }
 
 export const RSS_SOURCES: RssSourceConfig[] = [
+  {
+    id: 'balkanweb-kryesore',
+    name: 'BalkanWeb',
+    url: 'https://balkanweb.com/feed/',
+    logoText: 'BALKANWEB',
+    category: 'Aktualitet'
+  },
+  {
+    id: 'balkanweb-shqiperi',
+    name: 'BalkanWeb Shqipëri',
+    url: 'https://balkanweb.com/category/shqiperi/feed/',
+    logoText: 'BALKANWEB',
+    category: 'Shqipëri',
+    categoryDefault: 'shqiperi'
+  },
+  {
+    id: 'balkanweb-politike',
+    name: 'BalkanWeb Politikë',
+    url: 'https://balkanweb.com/category/politike/feed/',
+    logoText: 'BALKANWEB',
+    category: 'Politikë',
+    categoryDefault: 'politike'
+  },
+  {
+    id: 'balkanweb-kronike',
+    name: 'BalkanWeb Kronikë',
+    url: 'https://balkanweb.com/category/kronike/feed/',
+    logoText: 'BALKANWEB',
+    category: 'Kronikë',
+    categoryDefault: 'kronike'
+  },
+  {
+    id: 'balkanweb-ekonomi',
+    name: 'BalkanWeb Ekonomi',
+    url: 'https://balkanweb.com/category/ekonomi/feed/',
+    logoText: 'BALKANWEB',
+    category: 'Ekonomi',
+    categoryDefault: 'ekonomi'
+  },
+  {
+    id: 'balkanweb-bota',
+    name: 'BalkanWeb Bota',
+    url: 'https://balkanweb.com/category/bota/feed/',
+    logoText: 'BALKANWEB',
+    category: 'Bota',
+    categoryDefault: 'bota'
+  },
+  {
+    id: 'euronewsal',
+    name: 'Euronews AL',
+    url: 'https://euronews.al/feed/',
+    logoText: 'EURONEWS',
+    category: 'Shqipëri & Rajon'
+  },
+  {
+    id: 'euronewsal-rajoni',
+    name: 'Euronews Rajoni',
+    url: 'https://euronews.al/category/rajoni/feed/',
+    logoText: 'EURONEWS',
+    category: 'Bota & Rajoni',
+    categoryDefault: 'bota'
+  },
   {
     id: 'telegrafi',
     name: 'Telegrafi',
@@ -25,18 +88,12 @@ export const RSS_SOURCES: RssSourceConfig[] = [
     category: 'Kryesore'
   },
   {
-    id: 'euronewsal',
-    name: 'Euronews AL',
-    url: 'https://euronews.al/feed/',
-    logoText: 'EURONEWS',
-    category: 'Shqipëri & Rajon'
-  },
-  {
     id: 'koha',
     name: 'Koha.net',
     url: 'https://www.koha.net/rss',
     logoText: 'KOHA',
-    category: 'Vendi'
+    category: 'Vendi',
+    categoryDefault: 'kosove'
   },
   {
     id: 'reporteri',
@@ -46,25 +103,20 @@ export const RSS_SOURCES: RssSourceConfig[] = [
     category: 'Investigim'
   },
   {
-    id: 'balkanweb',
-    name: 'BalkanWeb',
-    url: 'https://balkanweb.com/feed/',
-    logoText: 'BALKANWEB',
-    category: 'Aktualitet'
-  },
-  {
     id: 'lajminet',
     name: 'Lajmi.net',
     url: 'https://lajmi.net/feed/',
     logoText: 'LAJMI.NET',
-    category: 'Lajme'
+    category: 'Lajme',
+    categoryDefault: 'kosove'
   },
   {
     id: 'indeksonline',
     name: 'IndeksOnline',
     url: 'https://indeksonline.net/feed/',
     logoText: 'INDEKS',
-    category: 'Kryesore'
+    category: 'Kryesore',
+    categoryDefault: 'kosove'
   }
 ];
 
@@ -193,6 +245,78 @@ function extractImage(item: any): string | null {
   return null;
 }
 
+export function detectCategory(
+  headline: string,
+  summary: string = '',
+  categories: string[] = [],
+  link: string = '',
+  sourceName: string = ''
+): string {
+  const text = `${headline} ${summary}`.toLowerCase();
+  const catText = categories.join(' ').toLowerCase();
+  const urlLower = link.toLowerCase();
+
+  // 1. Direct feed category or URL check
+  if (catText.includes('sport') || urlLower.includes('/sport')) return 'sport';
+  if (catText.includes('kosov') || urlLower.includes('/kosove')) return 'kosove';
+  if (catText.includes('kronik') || urlLower.includes('/kronike')) return 'kronike';
+  if (catText.includes('ekonomi') || urlLower.includes('/ekonomi') || catText.includes('biznes') || urlLower.includes('/biznes')) return 'ekonomi';
+  if (catText.includes('bota') || urlLower.includes('/bota')) return 'bota';
+  if (catText.includes('showbiz') || catText.includes('kultur') || catText.includes('vip') || urlLower.includes('/showbiz') || urlLower.includes('/kulture')) return 'kulture';
+  if (catText.includes('teknologji') || urlLower.includes('/teknologji')) return 'teknologji';
+  if (catText.includes('politik') || urlLower.includes('/politike')) return 'politike';
+
+  // 2. High-precision keyword check
+  // Sport
+  if (/\b(futboll|futbollist|ndeshje|kampionat|champions league|premier league|serie a|la liga|superligë|superliga|uefa|fifa|trajnere|trajner|kuqezinj|vllaznia|partizani|skënderbeu|ballkani|drita|reali|barça|barcelona|milan|inter|juventus|messi|ronaldo|yamal|mbappe|chelsea|arsenal|liverpool|transferim|tenis|basketboll|boks|mundje|stadion|arbitër|gol|gola)\b/i.test(text)) {
+    return 'sport';
+  }
+
+  // Kronikë & Siguri
+  if (/\b(arrestohet|arrestohen|pranga|kapet|kapen|policia|policë|spak|gjkko|droga|kokainë|kanabis|vrasje|vrasja|plagosje|plagoset|aksident|përplasje|grabitje|dënohet|burg|burgim|hetim|kontroll|sekuestrohet|renea|zjarr|ekzekutim)\b/i.test(text)) {
+    return 'kronike';
+  }
+
+  // Kosovë (Specific events, institutions, or personalities)
+  if (/\b(kosovë|kosova|prishtinë|prishtina|kurti|albin kurti|vjosa osmani|prizren|pejë|peja|mitrovicë|mitrovica|ferizaj|gjakovë|gjilan|kfor|eulex|qeveria e kosovës|policia e kosovës|kuvendi i kosovës|kosovar)\b/i.test(text)) {
+    return 'kosove';
+  }
+
+  // Bota / Ndërkombëtare
+  if (/\b(trump|biden|putin|zelensky|rusia|ukraina|kiev|moskë|shba|washington|shtëpia e bardhë|bashkimi evropian|bruksel|nato|izrael|gaza|netanyahu|iran|teheran|kinë|pekin|francë|macron|gjermani|scholz|britani|londër|itali|meloni|greqi|turqi|erdogan)\b/i.test(text)) {
+    return 'bota';
+  }
+
+  // Politikë
+  if (/\b(kryeministër|kryeministri|ministër|ministrja|ministria|deputet|deputetët|kuvend|kuvendi|parlament|parlamenti|qeveria|edi rama|rama|sali berisha|berisha|basha|opozita|mazhoranca|zgjedhje|zgjedhjet|votim|votimi|partia demokratike|partia socialiste|lsi|koalicion)\b/i.test(text)) {
+    return 'politike';
+  }
+
+  // Ekonomi
+  if (/\b(ekonomi|ekonomia|biznes|biznesi|tregu|çmimi|çmimet|inflacion|tatime|tatimet|euro|leku|valuta|eksport|import|paga|pagat|investim|investimet|buxheti|fmn|kredi|kredia|bursë)\b/i.test(text)) {
+    return 'ekonomi';
+  }
+
+  // Showbiz / Kulturë
+  if (/\b(big brother|bbv|vip|këngëtar|këngëtare|aktore|aktor|filmi|koncert|festival|hollywood|estrad|muzikë|muzika|modelja|dasma|romanc)\b/i.test(text)) {
+    return 'kulture';
+  }
+
+  // Teknologji
+  if (/\b(inteligjenc[eë] artificiale|chatgpt|openai|iphone|samsung|robotik[eë]|teknologji|haker|kriptovalut|bitcoin)\b/i.test(text)) {
+    return 'teknologji';
+  }
+
+  // If item comes from a Kosovo portal and not classified elsewhere, classify as Kosovë
+  const isKosovoSource = ['Telegrafi', 'Gazeta Express', 'Koha.net', 'Reporteri', 'Lajmi.net', 'IndeksOnline'].includes(sourceName);
+  if (isKosovoSource) {
+    return 'kosove';
+  }
+
+  // Default to Shqipëri
+  return 'shqiperi';
+}
+
 export async function fetchAlbanianRssNews(forceRefresh = false): Promise<NewsItem[]> {
   const now = Date.now();
   if (!forceRefresh && feedCache && (now - feedCache.lastFetched < CACHE_TTL_MS)) {
@@ -255,6 +379,9 @@ export async function fetchAlbanianRssNews(forceRefresh = false): Promise<NewsIt
 
           const uniqueId = `rss-${src.id}-${index}-${Math.abs(headline.split('').reduce((a, b) => ((a << 5) - a) + b.charCodeAt(0), 0))}`;
 
+          const itemCategories = Array.isArray(item.categories) ? item.categories : [];
+          const category = src.categoryDefault || detectCategory(headline, cleanSummary, itemCategories, item.link || '', src.name);
+
           items.push({
             id: uniqueId,
             headline,
@@ -271,7 +398,8 @@ export async function fetchAlbanianRssNews(forceRefresh = false): Promise<NewsIt
             updatedAt: itemDate.toISOString(),
             link: item.link || '',
             isRss: true,
-            summary: cleanSummary
+            summary: cleanSummary,
+            category
           });
         });
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { collection, onSnapshot, query, orderBy, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { NewsItem, AppStatus, TVVideo, TVAd, TVLowerThird } from '../types';
+import { NewsItem, AppStatus, TVVideo, TVAd, TVLowerThird, getCategoryConfig } from '../types';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import MediaContainer from './MediaContainer';
@@ -25,7 +25,8 @@ import {
   CloudLightning, 
   SunDim,
   AlertTriangle,
-  LucideIcon
+  LucideIcon,
+  Settings
 } from 'lucide-react';
 
 
@@ -146,23 +147,42 @@ export default function LiveOutput() {
       lastUpdated: serverTimestamp()
     });
   };
-  // Combine manual news items with automatic nonstop RSS news items
+  // Combine manual news items with automatic nonstop RSS news items, filtered by category preferences
   const displayNews = React.useMemo(() => {
+    let pool: NewsItem[] = [];
+
     // If RSS is explicitly turned off
     if (status?.rssEnabled === false || status?.rssMode === 'manual_only') {
-      return newsItems;
+      pool = newsItems;
+    } else if (status?.rssMode === 'rss_only') {
+      // If RSS-only mode
+      pool = rssNews.length > 0 ? rssNews : newsItems;
+    } else {
+      // Mixed mode: manual news items first, followed by nonstop RSS news
+      if (newsItems.length > 0 && rssNews.length > 0) {
+        pool = [...newsItems, ...rssNews];
+      } else if (rssNews.length > 0) {
+        pool = rssNews;
+      } else {
+        pool = newsItems;
+      }
     }
-    // If RSS-only mode
-    if (status?.rssMode === 'rss_only') {
-      return rssNews.length > 0 ? rssNews : newsItems;
+
+    // Filter by allowed categories (configured in Admin Dashboard)
+    if (status?.allowedCategories && Array.isArray(status.allowedCategories) && status.allowedCategories.length > 0) {
+      const allowedSet = new Set(status.allowedCategories);
+      pool = pool.filter(item => {
+        // If an item has an explicit category, filter by it
+        if (item.category) {
+          return allowedSet.has(item.category);
+        }
+        // Manual items without category are allowed by default
+        return true;
+      });
     }
-    // Mixed mode: manual news items first, followed by nonstop RSS news
-    if (newsItems.length > 0 && rssNews.length > 0) {
-      return [...newsItems, ...rssNews];
-    }
-    if (rssNews.length > 0) return rssNews;
-    return newsItems;
-  }, [newsItems, rssNews, status?.rssEnabled, status?.rssMode]);
+
+    return pool;
+  }, [newsItems, rssNews, status?.rssEnabled, status?.rssMode, status?.allowedCategories]);
 
   const safeIndex = displayNews.length > 0 ? currentIndex % displayNews.length : 0;
   const activeItem = displayNews[safeIndex] || null;
@@ -403,7 +423,17 @@ export default function LiveOutput() {
             </h1>
           </div>
           
-          <ClockWidget />
+          <div className="flex items-center gap-3">
+            <ClockWidget />
+            <a 
+              href="?mode=admin"
+              className="opacity-30 hover:opacity-100 transition-all px-3 py-3 rounded-2xl bg-black/60 border border-white/10 hover:border-brand-red text-white flex items-center gap-2 text-xs font-bold shadow-xl"
+              title="Hap Panelin Admin"
+            >
+              <Settings size={18} className="text-brand-red animate-[spin_10s_linear_infinite]" />
+              <span className="hidden md:inline text-[10px] uppercase font-black tracking-widest">Admin</span>
+            </a>
+          </div>
         </div>
 
         {/* Content Area */}
@@ -557,6 +587,17 @@ export default function LiveOutput() {
                                      })()}
                                    </span>
                                  </div>
+                                 {activeItem.category && (
+                                   <div className={cn(
+                                     "px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider border shadow-md flex items-center gap-1.5",
+                                     getCategoryConfig(activeItem.category).badgeBg,
+                                     getCategoryConfig(activeItem.category).badgeText,
+                                     getCategoryConfig(activeItem.category).badgeBorder
+                                   )}>
+                                     <span className="w-2 h-2 rounded-full" style={{ backgroundColor: getCategoryConfig(activeItem.category).color }} />
+                                     {getCategoryConfig(activeItem.category).short}
+                                   </div>
+                                 )}
                                  {activeItem.source && (
                                    <div className="bg-white/10 backdrop-blur-md border border-white/20 px-3.5 py-1.5 rounded-lg text-sm font-black text-white uppercase tracking-wider shadow-lg flex items-center gap-1.5">
                                      <span className="w-1.5 h-1.5 rounded-full bg-brand-red animate-pulse" />

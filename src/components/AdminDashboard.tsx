@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { NewsItem, AppStatus, TVVideo, TVAd, TVLowerThird } from '../types';
+import { NewsItem, AppStatus, TVVideo, TVAd, TVLowerThird, ALL_NEWS_CATEGORIES, getCategoryConfig } from '../types';
 import { 
   Plus, 
   Trash2, 
@@ -17,7 +17,14 @@ import {
   Menu,
   X as CloseIcon,
   Monitor,
-  Newspaper
+  Newspaper,
+  CheckCircle2,
+  Circle,
+  Sliders,
+  Filter,
+  Sparkles,
+  ShieldCheck,
+  Check
 } from 'lucide-react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
@@ -94,6 +101,50 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     if (!status) return;
     updateDoc(doc(db, 'status', 'current'), {
       isPlaying: !status.isPlaying,
+      lastUpdated: serverTimestamp()
+    });
+  };
+
+  // Categories allowed for right-hand headlines
+  const allowedCategories = status?.allowedCategories !== undefined 
+    ? status.allowedCategories 
+    : ALL_NEWS_CATEGORIES.map(c => c.id);
+
+  const toggleCategory = async (catId: string) => {
+    let next: string[];
+    if (allowedCategories.includes(catId)) {
+      if (allowedCategories.length <= 1) {
+        alert("Duhet të jetë të paktën një kategori aktive për transmetim.");
+        return;
+      }
+      next = allowedCategories.filter(c => c !== catId);
+    } else {
+      next = [...allowedCategories, catId];
+    }
+    await updateDoc(doc(db, 'status', 'current'), {
+      allowedCategories: next,
+      lastUpdated: serverTimestamp()
+    });
+  };
+
+  const selectAllCategories = async () => {
+    await updateDoc(doc(db, 'status', 'current'), {
+      allowedCategories: ALL_NEWS_CATEGORIES.map(c => c.id),
+      lastUpdated: serverTimestamp()
+    });
+  };
+
+  const excludeKosovoAndSport = async () => {
+    const filtered = ALL_NEWS_CATEGORIES.map(c => c.id).filter(id => id !== 'kosove' && id !== 'sport');
+    await updateDoc(doc(db, 'status', 'current'), {
+      allowedCategories: filtered,
+      lastUpdated: serverTimestamp()
+    });
+  };
+
+  const selectAlbaniaPoliticsOnly = async () => {
+    await updateDoc(doc(db, 'status', 'current'), {
+      allowedCategories: ['shqiperi', 'politike', 'kronike', 'ekonomi'],
       lastUpdated: serverTimestamp()
     });
   };
@@ -251,7 +302,147 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                </button>
             </header>
 
-            <main className="flex-1 overflow-y-auto p-4 md:p-10 bg-[radial-gradient(circle_at_50%_0%,rgba(204,0,0,0.05),transparent)]">
+            <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-[radial-gradient(circle_at_50%_0%,rgba(204,0,0,0.05),transparent)] space-y-6">
+              {/* Category Filter for Right-Side Titles */}
+              <div className="max-w-4xl mx-auto bg-gradient-to-br from-[#121215] to-[#0a0a0d] border border-white/10 rounded-2xl p-5 md:p-6 shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-80 h-80 bg-brand-red/5 rounded-full blur-3xl pointer-events-none" />
+
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-brand-red/10 border border-brand-red/20 flex items-center justify-center text-brand-red shrink-0">
+                      <Sliders size={18} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm md:text-base font-black uppercase tracking-wider text-white">
+                        Kategoritë e Titujve (Krahu i Djathtë)
+                      </h3>
+                      <p className="text-[11px] text-white/40 font-medium">
+                        Zgjidhni cilat lajme dëshironi të shfaqen në kolonën e djathtë të ekranit
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <span className="text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-white/5 border border-white/10 text-white/70">
+                      {allowedCategories.length}/{ALL_NEWS_CATEGORIES.length} Aktive
+                    </span>
+                  </div>
+                </div>
+
+                {/* Quick Presets */}
+                <div className="flex flex-wrap items-center gap-2 mb-5 pt-1">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-white/30 mr-1 flex items-center gap-1">
+                    <Sparkles size={12} className="text-amber-400" /> Parazgjedhje:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={excludeKosovoAndSport}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all border flex items-center gap-1.5",
+                      (!allowedCategories.includes('kosove') && !allowedCategories.includes('sport'))
+                        ? "bg-brand-red text-white border-brand-red shadow-[0_0_15px_rgba(204,0,0,0.3)]"
+                        : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10 hover:text-white"
+                    )}
+                  >
+                    <span>⚡ Pa Kosovë & Pa Sport</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={selectAllCategories}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all border",
+                      allowedCategories.length === ALL_NEWS_CATEGORIES.length
+                        ? "bg-white text-black border-white"
+                        : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10 hover:text-white"
+                    )}
+                  >
+                    Të Gjitha Kategoritë
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={selectAlbaniaPoliticsOnly}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all border",
+                      (allowedCategories.length === 4 && allowedCategories.includes('shqiperi') && !allowedCategories.includes('kosove') && !allowedCategories.includes('sport'))
+                        ? "bg-white text-black border-white"
+                        : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10 hover:text-white"
+                    )}
+                  >
+                    Vetëm Shqipëri & Politikë
+                  </button>
+                </div>
+
+                {/* Categories Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                  {ALL_NEWS_CATEGORIES.map((cat) => {
+                    const isAllowed = allowedCategories.includes(cat.id);
+                    const isUserAttention = cat.id === 'kosove' || cat.id === 'sport';
+
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => toggleCategory(cat.id)}
+                        className={cn(
+                          "flex items-center justify-between p-3 rounded-xl border transition-all text-left group",
+                          isAllowed
+                            ? "bg-white/[0.04] border-white/15 hover:border-white/30"
+                            : "bg-black/30 border-white/5 opacity-40 hover:opacity-70"
+                        )}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div 
+                            className="w-2.5 h-2.5 rounded-full shrink-0" 
+                            style={{ backgroundColor: cat.color }} 
+                          />
+                          <div className="flex flex-col min-w-0">
+                            <span className={cn(
+                              "text-xs font-bold truncate",
+                              isAllowed ? "text-white" : "text-white/40 line-through"
+                            )}>
+                              {cat.name}
+                            </span>
+                            <span className="text-[9px] text-white/30 truncate">
+                              {cat.description}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="shrink-0 ml-2 flex items-center">
+                          {isAllowed ? (
+                            <CheckCircle2 size={16} className="text-emerald-400 group-hover:scale-110 transition-transform" />
+                          ) : (
+                            <Circle size={16} className="text-white/20 group-hover:text-white/40 transition-colors" />
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-[10px] text-white/40">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Sinkronizuar me OBS & Transmetimin LIVE në kohë reale
+                  </span>
+                  <span>
+                    {!allowedCategories.includes('kosove') && !allowedCategories.includes('sport') ? (
+                      <span className="text-emerald-400 font-bold">Kosovë & Sport janë të bllokuara</span>
+                    ) : null}
+                  </span>
+                </div>
+              </div>
+
+              {/* News Queue Header */}
+              <div className="max-w-4xl mx-auto flex items-center justify-between pt-2">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-xs font-black uppercase tracking-widest text-white/50">Radha e Lajmeve Manuale</h4>
+                  <span className="text-[10px] text-white/20">({items.length})</span>
+                </div>
+              </div>
+
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={items} strategy={verticalListSortingStrategy}>
                   <div className="max-w-4xl mx-auto flex flex-col gap-3">
@@ -362,6 +553,16 @@ function SortableItem({ item, onEdit, onDelete }: { item: NewsItem; onEdit: () =
              </span>
            )}
            <span className="text-[8px] md:text-[9px] font-bold opacity-30">{item.duration}s</span>
+           {item.category && (
+             <span className={cn(
+               "text-[8px] md:text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border",
+               getCategoryConfig(item.category).badgeBg,
+               getCategoryConfig(item.category).badgeText,
+               getCategoryConfig(item.category).badgeBorder
+             )}>
+               {getCategoryConfig(item.category).short}
+             </span>
+           )}
            {item.source && (
              <span className="text-[8px] md:text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-white/10 text-white/80 border border-white/10 truncate max-w-[120px]">
                Burimi: {item.source}

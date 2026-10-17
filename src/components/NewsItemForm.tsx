@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { NewsItem, MediaType } from '../types';
+import React, { useState } from 'react';
+import { NewsItem, MediaType, ALL_NEWS_CATEGORIES } from '../types';
 import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../lib/firebase';
-import { X, Image as ImageIcon, Video as VideoIcon, Save, Upload } from 'lucide-react';
+import { X, Image as ImageIcon, Video as VideoIcon, Save, Upload, Tag } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface Props {
@@ -27,6 +27,7 @@ export default function NewsItemForm({ initialData, nextOrder, onClose }: Props)
     breakingNewsStartedAt: initialData?.breakingNewsStartedAt || '',
     publishedTime: initialData?.publishedTime || new Date().toLocaleTimeString('sq-AL', { hour: '2-digit', minute: '2-digit' }),
     source: initialData?.source || '',
+    category: initialData?.category || 'shqiperi',
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -225,6 +226,31 @@ export default function NewsItemForm({ initialData, nextOrder, onClose }: Props)
                     onChange={e => setFormData({...formData, publishedTime: e.target.value})}
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-4 focus:outline-none focus:border-brand-red font-bold text-center"
                   />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-white/30 block mb-2">KATEGORIA E LAJMIT</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {ALL_NEWS_CATEGORIES.map(cat => {
+                    const isSelected = formData.category === cat.id;
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, category: cat.id })}
+                        className={cn(
+                          "px-3 py-2 rounded-xl text-xs font-bold transition-all border text-left flex items-center justify-between",
+                          isSelected
+                            ? "bg-white text-black border-white shadow-lg"
+                            : "bg-white/5 text-white/60 border-white/10 hover:border-white/20 hover:text-white"
+                        )}
+                      >
+                        <span className="truncate">{cat.name}</span>
+                        {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-brand-red ml-1 shrink-0" />}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
