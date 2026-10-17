@@ -15,6 +15,9 @@ export interface NewsItem {
   order: number;
   createdAt: string;
   updatedAt: string;
+  link?: string;
+  isRss?: boolean;
+  summary?: string;
 }
 
 export interface AppStatus {
@@ -34,6 +37,8 @@ export interface AppStatus {
   transportAction?: 'play' | 'pause' | 'stop' | 'restart' | 'next' | 'prev';
   stationName?: string;
   socialHandle?: string;
+  rssEnabled?: boolean;
+  rssMode?: 'mixed' | 'rss_only' | 'manual_only';
 }
 
 export interface TVVideo {

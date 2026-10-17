@@ -323,21 +323,26 @@ export default function LiveOutput() {
 
   // Dynamic typography for headline length
   const getDynamicStyles = (headline: string) => {
-    const hLen = headline.length;
+    const hLen = headline ? headline.length : 0;
     let hSize = "text-4xl xl:text-5xl";
-    if (hLen > 110) {
+    let leading = "leading-[1.12]";
+    if (hLen > 220) {
+      hSize = "text-xl xl:text-2xl";
+      leading = "leading-snug";
+    } else if (hLen > 120) {
       hSize = "text-2xl xl:text-3xl";
-    } else if (hLen > 75) {
+      leading = "leading-snug";
+    } else if (hLen > 60) {
       hSize = "text-3xl xl:text-4xl";
-    } else if (hLen > 45) {
+      leading = "leading-[1.15]";
+    } else {
       hSize = "text-4xl xl:text-5xl";
-    } else if (hLen < 25) {
-      hSize = "text-5xl xl:text-6xl";
+      leading = "leading-[1.1]";
     }
-    return { hSize };
+    return { hSize, leading };
   };
 
-  const dynamicStyles = activeItem ? getDynamicStyles(activeItem.headline) : { hSize: "text-4xl xl:text-5xl" };
+  const dynamicStyles = activeItem ? getDynamicStyles(activeItem.headline) : { hSize: "text-4xl xl:text-5xl", leading: "leading-[1.1]" };
 
   return (
     <div 
@@ -566,35 +571,21 @@ export default function LiveOutput() {
                                  <div className="h-1 flex-1 bg-white/10 rounded-full min-w-[20px]" />
                                </div>
 
-                               {(activeItem.headlines && activeItem.headlines.length > 0) ? (
-                                 activeItem.headlines.map((headline, idx) => (
-                                   <motion.h2 
-                                     key={idx}
-                                     initial={{ opacity: 0, y: 15 }}
-                                     animate={{ opacity: 1 - (idx * 0.25), y: 0 }}
-                                     transition={{ delay: idx * 0.15, duration: 0.6 }}
-                                     className={cn(
-                                       "font-black leading-[1.08] text-white tracking-wide uppercase transition-all duration-300 drop-shadow-md",
-                                       dynamicStyles.hSize
-                                     )}
-                                   >
-                                     {headline}
-                                   </motion.h2>
-                                 ))
-                               ) : (
-                                 <h2 className={cn(
-                                   "font-black leading-[1.08] text-white tracking-wide uppercase transition-all duration-300 drop-shadow-md",
-                                   dynamicStyles.hSize
-                                 )}>
-                                   {activeItem.headline}
-                                 </h2>
-                               )}
-
-                               {activeItem.summary && activeItem.summary.length > 25 && (
-                                 <p className="text-white/70 text-sm md:text-base font-medium leading-relaxed line-clamp-3 mt-1 pr-2 border-t border-white/10 pt-2.5">
-                                   {activeItem.summary}
-                                 </p>
-                               )}
+                               <h2 
+                                 className={cn(
+                                   "font-black text-white tracking-wide uppercase transition-all duration-300 drop-shadow-md",
+                                   dynamicStyles.hSize,
+                                   dynamicStyles.leading
+                                 )}
+                                 style={{
+                                   display: '-webkit-box',
+                                   WebkitLineClamp: 8,
+                                   WebkitBoxOrient: 'vertical',
+                                   overflow: 'hidden'
+                                 }}
+                               >
+                                 {activeItem.headline}
+                               </h2>
                              </div>
                           </motion.div>
                         )}
